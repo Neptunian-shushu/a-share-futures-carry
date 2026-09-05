@@ -17,8 +17,8 @@ The key point is that this is **not market-neutral arbitrage**. A long futures p
 1. ETF / spot buy-and-hold benchmark
 2. Front-month futures roll
 3. Second-month futures roll
-4. Maximum annualized carry contract
-5. Dynamic IC/IM carry selection
+4. Maximum annualized carry contract within each family
+5. Dynamic IC/IM maximum-carry selection
 
 ## Core definitions
 
@@ -38,7 +38,7 @@ This distinction matters because not all futures discount is alpha.
 configs/                  Strategy configuration
 scripts/                  Runnable research scripts
 src/a_share_futures_carry/
-  data/                    Data schemas/loaders
+  data/                    Data schemas/loaders/providers
   signals/                 Basis and carry signals
   strategy/                Contract-selection rules
   backtest/                Portfolio simulation
@@ -54,16 +54,63 @@ outputs/                    Backtest outputs (gitignored)
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e '.[dev]'
 pytest
 python scripts/run_backtest.py --config configs/strategy.yaml
 ```
 
-The initial runner uses synthetic data so that the repository is executable before a commercial/official historical data source is connected.
+The synthetic runner keeps the project executable even when no market-data vendor is connected.
 
-## Data needed for a production backtest
+## Real historical data with Tushare
 
-Daily contract-level data should include trade date, contract code, underlying family, futures close/settlement, spot index close, expiry date, volume/open interest, and preferably transaction-cost inputs. Funding/collateral rates and expected index dividends are needed for fair-value/excess-carry analysis.
+Tushare is the first implemented provider. It uses:
+
+- `fut_basic` for CFFEX contract metadata
+- `fut_daily` for individual futures contracts
+- `index_daily` for the corresponding cash indices
+
+Install the optional dependency and set your token:
+
+```bash
+pip install -e '.[tushare]'
+export TUSHARE_TOKEN='YOUR_TOKEN'
+```
+
+Download a normalized IC/IM contract panel:
+
+```bash
+python scripts/download_tushare.py \
+  --families IC IM \
+  --start 20220722 \
+  --end 20260901 \
+  --output data/raw/cffex_panel.csv
+```
+
+Then compare front-month, second-month, family max-carry and dynamic IC/IM strategies:
+
+```bash
+python scripts/run_real_backtest.py \
+  --data data/raw/cffex_panel.csv \
+  --config configs/strategy.yaml
+```
+
+The summary is saved to `outputs/strategy_summary.csv`.
+
+If Tushare permissions are unavailable, any vendor/export can be used through the CSV fallback as long as it contains the normalized columns below.
+
+## Normalized data schema
+
+Required columns:
+
+- `trade_date`
+- `contract`
+- `family` (`IF`, `IH`, `IC`, `IM`)
+- `futures_close`
+- `spot_close`
+- `expiry_date`
+- `multiplier`
+
+Useful optional columns include `settle`, `vol`, and `oi`.
 
 Recommended research history:
 
@@ -75,16 +122,24 @@ Recommended research history:
 
 The default research design caps futures notional exposure at 1.0x NAV. Margin availability is **not** treated as permission to lever the equity beta. Production implementation should additionally model variation margin, margin buffers, liquidity, limit moves, roll execution, commissions and slippage.
 
+## Current limitations
+
+The current backtest engine is deliberately minimal. It marks futures close-to-close and adds collateral yield, but it does not yet model daily settlement cash flows, exchange margin schedules, exact CFFEX expiry rules, roll slippage by liquidity, dividend fair value, or realistic integer contract sizing. These are next-stage research items rather than hidden assumptions.
+
 ## Roadmap
 
 - [x] Repository skeleton
 - [x] Carry calculations
-- [x] Basic max-carry selector
+- [x] Front/second/max-carry selectors
 - [x] Minimal futures PnL engine
-- [ ] Connect historical CFFEX/index data
-- [ ] Build robust contract calendar and roll rules
+- [x] Tushare historical-data provider
+- [x] CSV vendor fallback
+- [x] Real-data strategy comparison runner
+- [ ] Add AkShare/free-data provider
+- [ ] Build robust CFFEX contract calendar and roll rules
 - [ ] Add dividend and funding fair-value model
-- [ ] Compare IC/IM/front/second/max-carry strategies
+- [ ] Add integer sizing and variation-margin accounting
+- [ ] Add spot/ETF buy-and-hold benchmark
 - [ ] Add dynamic carry percentile/z-score allocation
 - [ ] Produce research report and charts
 
