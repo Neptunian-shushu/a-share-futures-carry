@@ -1,0 +1,27 @@
+strategy:
+  name: dynamic_max_carry
+  eligible_families: [IC, IM]
+  min_dte: 5
+  max_dte: 120
+  max_notional_to_nav: 1.0
+  roll_before_expiry_days: 3
+
+carry:
+  day_count: 365
+  use_fair_value_adjustment: false
+
+portfolio:
+  initial_nav: 1000000
+  collateral_yield_annual: 0.015
+  commission_bps: 0.5
+  slippage_bps: 0.5
+
+contracts:
+  IF:
+    multiplier: 300
+  IH:
+    multiplier: 300
+  IC:
+    multiplier: 200
+  IM:
+    multiplier: 200
