@@ -57,3 +57,23 @@ def test_akshare_provider_builds_normalized_panel_with_fake_client():
     assert panel["contract"].unique().tolist() == ["IC2602"]
     assert panel["expiry_date"].iloc[0] == pd.Timestamp("2026-02-20")
     assert panel["spot_close"].tolist() == [6100.0, 6110.0]
+
+
+class _FakeAkshareSinaFallback(_FakeAkshare):
+    def index_zh_a_hist(self, symbol, period, start_date, end_date):
+        raise RuntimeError("primary index endpoint unavailable")
+
+    def stock_zh_index_daily(self, symbol):
+        return pd.DataFrame(
+            {
+                "date": ["2026-01-01", "2026-01-02", "2026-01-03"],
+                "close": [6090.0, 6100.0, 6110.0],
+            }
+        )
+
+
+def test_akshare_provider_falls_back_to_sina_index_history():
+    panel = AkshareProvider(client=_FakeAkshareSinaFallback()).build_contract_panel(
+        ["IC"], "20260102", "20260103"
+    )
+    assert panel["spot_close"].tolist() == [6100.0, 6110.0]

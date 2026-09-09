@@ -92,18 +92,32 @@ class AkshareProvider:
     def fetch_index_daily(self, family: str, start_date: str, end_date: str) -> pd.DataFrame:
         code = INDEX_CODE_MAP[family]
         symbol = code.split(".")[0]
+        errors: list[Exception] = []
         if hasattr(self.client, "index_zh_a_hist"):
-            raw = self.client.index_zh_a_hist(
-                symbol=symbol,
-                period="daily",
-                start_date=start_date,
-                end_date=end_date,
-            )
-        elif hasattr(self.client, "stock_zh_index_daily"):
-            raw = self.client.stock_zh_index_daily(symbol=symbol)
-        else:
-            raise AttributeError("AkShare client lacks an index history interface")
-        return _normalize_index_history(raw)
+            try:
+                raw = self.client.index_zh_a_hist(
+                    symbol=symbol,
+                    period="daily",
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                normalized = _normalize_index_history(raw)
+                if not normalized.empty:
+                    return normalized
+            except Exception as exc:  # pragma: no cover - vendor/network dependent
+                errors.append(exc)
+        if hasattr(self.client, "stock_zh_index_daily"):
+            try:
+                raw = self.client.stock_zh_index_daily(symbol=f"sh{symbol}")
+                normalized = _normalize_index_history(raw)
+                start = pd.Timestamp(start_date)
+                end = pd.Timestamp(end_date)
+                return normalized[normalized["trade_date"].between(start, end)].reset_index(drop=True)
+            except Exception as exc:  # pragma: no cover - vendor/network dependent
+                errors.append(exc)
+        if errors:
+            raise RuntimeError(f"AkShare index history unavailable for {family}") from errors[-1]
+        raise AttributeError("AkShare client lacks an index history interface")
 
     def fetch_contract_info(self, date: str) -> pd.DataFrame:
         if not hasattr(self.client, "futures_contract_info_cffex"):
