@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pandas as pd
@@ -21,6 +22,31 @@ def spot_benchmark_returns(panel: pd.DataFrame, family: str) -> pd.Series:
         .astype(float)
     )
     return daily.pct_change().fillna(0.0).rename(f"{family}_spot_return")
+
+
+def price_benchmark_returns(
+    prices: pd.DataFrame,
+    *,
+    date_column: str = "trade_date",
+    price_column: str = "close",
+) -> pd.Series:
+    """Convert a dated ETF or index close series into benchmark returns."""
+    if date_column not in prices or price_column not in prices:
+        raise ValueError(f"Benchmark requires {date_column} and {price_column}")
+    series = prices[[date_column, price_column]].copy()
+    series[date_column] = pd.to_datetime(series[date_column])
+    series[price_column] = pd.to_numeric(series[price_column], errors="coerce")
+    if series[date_column].duplicated().any():
+        raise ValueError("Benchmark contains duplicate dates")
+    if (series[price_column] <= 0).any() or series[price_column].isna().any():
+        raise ValueError("Benchmark prices must be strictly positive")
+    return (
+        series.sort_values(date_column)
+        .set_index(date_column)[price_column]
+        .pct_change()
+        .fillna(0.0)
+        .rename("benchmark_return")
+    )
 
 
 def spot_benchmark_backtest(panel: pd.DataFrame, family: str, initial_nav: float) -> pd.DataFrame:
@@ -93,6 +119,9 @@ def generate_research_report(
             pd.concat(roll_frames, ignore_index=True).to_csv(output / "roll_events.csv", index=False)
 
     try:
+        mpl_config = output / ".matplotlib"
+        mpl_config.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("MPLCONFIGDIR", str(mpl_config))
         import matplotlib.pyplot as plt
     except ImportError:
         return summary_df

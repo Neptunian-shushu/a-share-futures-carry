@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import json
 from pathlib import Path
 import sys
 
@@ -18,6 +20,7 @@ def main() -> None:
     parser.add_argument("--start", required=True, help="YYYYMMDD")
     parser.add_argument("--end", required=True, help="YYYYMMDD")
     parser.add_argument("--output", default="data/raw/cffex_panel.csv")
+    parser.add_argument("--metadata-output", default=None)
     args = parser.parse_args()
 
     provider = TushareProvider()
@@ -29,6 +32,23 @@ def main() -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     panel.to_csv(output, index=False)
     print(f"Saved {len(panel):,} rows to {output}")
+    metadata_output = Path(args.metadata_output) if args.metadata_output else output.with_suffix(output.suffix + ".json")
+    metadata_output.write_text(
+        json.dumps(
+            {
+                "provider": "tushare",
+                "families": args.families,
+                "start_date": args.start,
+                "end_date": args.end,
+                "rows": len(panel),
+                "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    print(f"Saved metadata to {metadata_output}")
 
 
 if __name__ == "__main__":

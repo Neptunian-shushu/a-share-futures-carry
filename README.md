@@ -118,7 +118,8 @@ python scripts/download_akshare.py \
 
 The upstream interface is documented in the [AkShare futures documentation](https://github.com/akfamily/akshare/blob/main/docs/data/futures/futures.md).
 Because free endpoints can change or rate-limit, save downloaded CSV snapshots and
-record the provider/date range alongside research outputs.
+the command writes a JSON sidecar containing provider, families, date range, row count
+and generation time. Keep that sidecar with the CSV snapshot.
 
 ## Normalized data schema
 
@@ -143,6 +144,15 @@ python scripts/validate_data.py --data data/raw/cffex_panel.csv
 
 Validation rejects invalid dates, duplicate `(trade_date, contract)` rows, non-positive
 prices/multipliers, negative margin rates, and inconsistent expiry dates.
+
+To reconcile two independent snapshots after normalization:
+
+```bash
+python scripts/compare_panels.py \
+  --left data/raw/cffex_panel.csv \
+  --right data/raw/cffex_panel_akshare.csv \
+  --differences-output outputs/panel_differences.csv
+```
 
 Recommended research history:
 
@@ -193,6 +203,17 @@ compared by converting its adjusted close series into the same dated return seri
 the current normalized panel intentionally keeps the cash-index benchmark separate
 from dividend-adjusted ETF data.
 
+For parameter selection, run the walk-forward study. Thresholds are selected on each
+training window and evaluated on the following test window:
+
+```bash
+python scripts/run_walk_forward.py \
+  --data data/raw/cffex_panel.csv \
+  --train-sessions 252 \
+  --test-sessions 63 \
+  --thresholds 0.3 0.5 0.7
+```
+
 ## Fair-value carry
 
 Set `carry.use_fair_value_adjustment: true` to calculate theoretical futures value from
@@ -231,7 +252,9 @@ total-return data against an independent source.
 The next research milestone is not another selector: it is a fixed historical data
 snapshot, independent-data reconciliation, walk-forward parameter selection, and
 out-of-sample performance attribution by beta, basis convergence, collateral yield,
-turnover and costs.
+turnover and costs. The repository now provides commands for each of those steps;
+the remaining work is to run them against authenticated historical snapshots and
+calibrate the resulting assumptions to exchange records.
 
 ## Disclaimer
 

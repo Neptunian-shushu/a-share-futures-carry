@@ -1,8 +1,7 @@
-"""Run a minimal synthetic-data carry backtest.
+"""Run a deterministic synthetic-data carry backtest.
 
-Replace ``make_synthetic_data`` with a real data loader once historical contract data
-is connected. Keeping the first version self-contained makes it easy to test the
-research pipeline end to end.
+The generated panel is also useful for testing the real-data runner without a vendor
+connection.
 """
 
 from __future__ import annotations
