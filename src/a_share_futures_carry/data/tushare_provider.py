@@ -16,12 +16,16 @@ from typing import Iterable
 
 import pandas as pd
 
+from .schema import prepare_contract_data
+
 INDEX_CODE_MAP = {
     "IF": "000300.SH",   # CSI 300
     "IH": "000016.SH",   # SSE 50
     "IC": "000905.SH",   # CSI 500
     "IM": "000852.SH",   # CSI 1000
 }
+
+MULTIPLIER_MAP = {"IF": 300.0, "IH": 300.0, "IC": 200.0, "IM": 200.0}
 
 
 @dataclass
@@ -48,7 +52,16 @@ class TushareProvider:
             return pd.DataFrame()
         meta = pd.concat(frames, ignore_index=True)
         keep = [c for c in ["ts_code", "symbol", "fut_code", "list_date", "delist_date", "multiplier"] if c in meta]
-        return meta[keep].drop_duplicates("ts_code")
+        meta = meta[keep].drop_duplicates("ts_code")
+        if "fut_code" not in meta or "ts_code" not in meta or "delist_date" not in meta:
+            raise ValueError("Tushare fut_basic response lacks contract identity or expiry metadata")
+        if "multiplier" not in meta:
+            meta["multiplier"] = meta["fut_code"].map(MULTIPLIER_MAP)
+        meta["multiplier"] = pd.to_numeric(meta["multiplier"], errors="coerce")
+        meta["multiplier"] = meta["multiplier"].fillna(meta["fut_code"].map(MULTIPLIER_MAP))
+        if meta["multiplier"].isna().any():
+            raise ValueError("Unable to determine contract multiplier for all futures")
+        return meta
 
     def fetch_index_daily(self, family: str, start_date: str, end_date: str) -> pd.DataFrame:
         index_code = INDEX_CODE_MAP[family]
@@ -119,4 +132,7 @@ class TushareProvider:
 
         if not frames:
             return pd.DataFrame()
-        return pd.concat(frames, ignore_index=True).sort_values(["trade_date", "family", "expiry_date"])
+        panel = pd.concat(frames, ignore_index=True).sort_values(
+            ["trade_date", "family", "expiry_date", "contract"]
+        )
+        return prepare_contract_data(panel)

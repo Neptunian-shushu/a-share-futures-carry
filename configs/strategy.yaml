@@ -5,16 +5,37 @@ strategy:
   max_dte: 120
   max_notional_to_nav: 1.0
   roll_before_expiry_days: 3
+  carry_column: signal_carry
 
 carry:
   day_count: 365
   use_fair_value_adjustment: false
+  funding_rate_annual: 0.02
+  dividend_yield_annual: 0.015
 
 portfolio:
-  initial_nav: 1000000
+  initial_nav: 10000000
   collateral_yield_annual: 0.015
   commission_bps: 0.5
   slippage_bps: 0.5
+  margin_rate: 0.12
+  margin_buffer: 1.2
+  integer_contracts: true
+  signal_lag_sessions: 1
+  execution_price_col: settle
+  mark_price_col: settle
+
+allocation:
+  enabled: true
+  method: percentile
+  lookback: 60
+  min_periods: 20
+  entry_threshold: 0.5
+  zscore_scale: 1.0
+  max_weight: 1.0
+
+report:
+  output_dir: outputs
 
 contracts:
   IF:
