@@ -77,3 +77,13 @@ def test_akshare_provider_falls_back_to_sina_index_history():
         ["IC"], "20260102", "20260103"
     )
     assert panel["spot_close"].tolist() == [6100.0, 6110.0]
+
+
+def test_akshare_provider_ignores_contract_info_endpoint_errors():
+    class _BrokenContractInfo(_FakeAkshare):
+        def futures_contract_info_cffex(self, date):
+            raise RuntimeError("metadata endpoint unavailable")
+
+    provider = AkshareProvider(client=_BrokenContractInfo())
+    info = provider.fetch_contract_info("20260102")
+    assert info.empty

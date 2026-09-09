@@ -122,7 +122,12 @@ class AkshareProvider:
     def fetch_contract_info(self, date: str) -> pd.DataFrame:
         if not hasattr(self.client, "futures_contract_info_cffex"):
             return pd.DataFrame()
-        raw = self.client.futures_contract_info_cffex(date=date)
+        try:
+            raw = self.client.futures_contract_info_cffex(date=date)
+        except Exception:
+            # Contract metadata is an enhancement; the contract code still
+            # allows a deterministic third-Friday fallback for the panel.
+            return pd.DataFrame()
         if raw is None or raw.empty:
             return pd.DataFrame()
         contract_column = _first_column(raw, ("合约代码", "symbol", "contract"))
