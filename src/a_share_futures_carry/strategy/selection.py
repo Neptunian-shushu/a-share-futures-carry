@@ -11,14 +11,22 @@ def _eligible(
     min_dte: int,
     max_dte: int,
     carry_column: str = "carry_ann",
+    min_volume: float = 0.0,
+    min_open_interest: float = 0.0,
 ) -> pd.DataFrame:
     if carry_column not in contracts:
         raise ValueError(f"Missing carry column: {carry_column}")
-    return contracts[
+    mask = (
         contracts["family"].isin(eligible_families)
         & contracts["dte"].between(min_dte, max_dte)
         & contracts[carry_column].notna()
-    ].copy()
+    )
+    for column, threshold in (("vol", min_volume), ("oi", min_open_interest)):
+        if threshold > 0:
+            if column not in contracts:
+                raise ValueError(f"Liquidity filter requires column: {column}")
+            mask &= pd.to_numeric(contracts[column], errors="coerce").ge(threshold)
+    return contracts[mask].copy()
 
 
 def select_max_carry(
@@ -27,9 +35,13 @@ def select_max_carry(
     min_dte: int = 5,
     max_dte: int = 120,
     carry_column: str = "carry_ann",
+    min_volume: float = 0.0,
+    min_open_interest: float = 0.0,
 ) -> pd.DataFrame:
     """Select the highest annualized-carry eligible contract each trade date."""
-    eligible = _eligible(contracts, eligible_families, min_dte, max_dte, carry_column)
+    eligible = _eligible(
+        contracts, eligible_families, min_dte, max_dte, carry_column, min_volume, min_open_interest
+    )
     if eligible.empty:
         return eligible
     idx = eligible.groupby("trade_date")[carry_column].idxmax()
@@ -43,6 +55,8 @@ def select_nth_expiry(
     min_dte: int = 1,
     max_dte: int = 180,
     carry_column: str = "carry_ann",
+    min_volume: float = 0.0,
+    min_open_interest: float = 0.0,
 ) -> pd.DataFrame:
     """Select the nth nearest eligible expiry within each family/date.
 
@@ -52,7 +66,9 @@ def select_nth_expiry(
     if n < 1:
         raise ValueError("n must be >= 1")
 
-    eligible = _eligible(contracts, eligible_families, min_dte, max_dte, carry_column)
+    eligible = _eligible(
+        contracts, eligible_families, min_dte, max_dte, carry_column, min_volume, min_open_interest
+    )
     if eligible.empty:
         return eligible
 
@@ -67,9 +83,19 @@ def select_family_max_carry(
     min_dte: int = 5,
     max_dte: int = 120,
     carry_column: str = "carry_ann",
+    min_volume: float = 0.0,
+    min_open_interest: float = 0.0,
 ) -> pd.DataFrame:
     """Select the best-carry contract within one index-futures family."""
-    return select_max_carry(contracts, (family,), min_dte, max_dte, carry_column)
+    return select_max_carry(
+        contracts,
+        (family,),
+        min_dte,
+        max_dte,
+        carry_column,
+        min_volume,
+        min_open_interest,
+    )
 
 
 def apply_roll_policy(
@@ -79,6 +105,8 @@ def apply_roll_policy(
     min_dte: int = 1,
     max_dte: int = 180,
     score_column: str = "signal_carry",
+    min_volume: float = 0.0,
+    min_open_interest: float = 0.0,
 ) -> pd.DataFrame:
     """Apply a deterministic expiry-roll rule to a daily target series.
 
@@ -106,6 +134,14 @@ def apply_roll_policy(
     for date, target in target_map.iterrows():
         day = market[market["trade_date"] == date]
         eligible = day[day["dte"].between(min_dte, max_dte)].copy()
+        if min_volume > 0:
+            if "vol" not in eligible:
+                raise ValueError("Liquidity filter requires column: vol")
+            eligible = eligible[pd.to_numeric(eligible["vol"], errors="coerce") >= min_volume]
+        if min_open_interest > 0:
+            if "oi" not in eligible:
+                raise ValueError("Liquidity filter requires column: oi")
+            eligible = eligible[pd.to_numeric(eligible["oi"], errors="coerce") >= min_open_interest]
         current = day[day["contract"] == held_contract] if held_contract is not None else day.iloc[0:0]
         force_roll = bool(not current.empty and current.iloc[0]["dte"] <= roll_before_expiry_days)
 

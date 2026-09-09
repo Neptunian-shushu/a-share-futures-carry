@@ -23,6 +23,22 @@ def spot_benchmark_returns(panel: pd.DataFrame, family: str) -> pd.Series:
     return daily.pct_change().fillna(0.0).rename(f"{family}_spot_return")
 
 
+def spot_benchmark_backtest(panel: pd.DataFrame, family: str, initial_nav: float) -> pd.DataFrame:
+    """Build a benchmark-shaped frame so spot performance appears in reports."""
+    returns = spot_benchmark_returns(panel, family)
+    if returns.empty:
+        return pd.DataFrame()
+    nav = initial_nav * (1.0 + returns).cumprod()
+    return pd.DataFrame(
+        {
+            "trade_date": returns.index,
+            "return": returns.to_numpy(),
+            "pnl": nav.diff().fillna(nav - initial_nav).to_numpy(),
+            "nav": nav.to_numpy(),
+        }
+    )
+
+
 def generate_research_report(
     backtests: dict[str, pd.DataFrame],
     output_dir: str | Path,

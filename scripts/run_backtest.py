@@ -99,6 +99,8 @@ def main() -> None:
         s["min_dte"],
         s["max_dte"],
         s["carry_column"],
+        s["min_volume"],
+        s["min_open_interest"],
     )
     selected = apply_roll_policy(
         selected,
@@ -107,6 +109,8 @@ def main() -> None:
         s["min_dte"],
         s["max_dte"],
         s["carry_column"],
+        s["min_volume"],
+        s["min_open_interest"],
     )
     allocation_cfg = cfg.get("allocation", {})
     if allocation_cfg.get("enabled", False):

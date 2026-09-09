@@ -37,3 +37,10 @@ def test_schema_rejects_non_positive_price():
     row["futures_close"] = 0
     with pytest.raises(ValueError, match="futures_close"):
         prepare_contract_data(pd.DataFrame([row]))
+
+
+def test_schema_rejects_non_numeric_optional_field():
+    row = _valid_row()
+    row["margin_rate"] = "not-a-rate"
+    with pytest.raises(ValueError, match="margin_rate"):
+        prepare_contract_data(pd.DataFrame([row]))

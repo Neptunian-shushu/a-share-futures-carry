@@ -66,7 +66,9 @@ def data_quality_report(df: pd.DataFrame) -> dict[str, object]:
     numeric_invalid: dict[str, int] = {}
     for column in NUMERIC_COLUMNS:
         if column in df:
-            invalid = int(pd.to_numeric(df[column], errors="coerce").isna().sum())
+            raw_values = df[column]
+            parsed = pd.to_numeric(raw_values, errors="coerce")
+            invalid = int((raw_values.notna() & parsed.isna()).sum())
             if invalid:
                 numeric_invalid[column] = invalid
     report["invalid_numeric_values"] = numeric_invalid
@@ -128,7 +130,16 @@ def prepare_contract_data(df: pd.DataFrame, *, drop_expired: bool = False) -> pd
     out["contract"] = out["contract"].astype(str).str.strip()
     for column in NUMERIC_COLUMNS:
         if column in out:
-            out[column] = pd.to_numeric(out[column], errors="coerce")
+            raw_values = out[column]
+            parsed = pd.to_numeric(raw_values, errors="coerce")
+            if (raw_values.notna() & parsed.isna()).any():
+                raise ValueError(f"{column} contains non-numeric values")
+            out[column] = parsed
+
+    if out["family"].isin(["", "NAN", "NONE"]).any():
+        raise ValueError("family must not be empty")
+    if out["contract"].isin(["", "NAN", "NONE"]).any():
+        raise ValueError("contract must not be empty")
 
     required_numeric = ["futures_close", "spot_close", "multiplier"]
     if out[required_numeric].isna().any().any():

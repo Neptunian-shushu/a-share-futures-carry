@@ -14,7 +14,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from a_share_futures_carry.backtest.engine import backtest_selected_contracts
 from a_share_futures_carry.data.csv_provider import load_contract_panel_csv
-from a_share_futures_carry.reporting.report import generate_research_report, spot_benchmark_returns
+from a_share_futures_carry.reporting.report import (
+    generate_research_report,
+    spot_benchmark_backtest,
+    spot_benchmark_returns,
+)
 from a_share_futures_carry.signals.basis import add_carry_columns
 from a_share_futures_carry.strategy.allocation import add_dynamic_carry_allocation
 from a_share_futures_carry.strategy.selection import (
@@ -34,6 +38,8 @@ def _with_roll_policy(selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -> 
         strategy["min_dte"],
         strategy["max_dte"],
         strategy["carry_column"],
+        strategy["min_volume"],
+        strategy["min_open_interest"],
     )
 
 
@@ -87,11 +93,34 @@ def main() -> None:
         if family_data.empty:
             continue
         benchmark = spot_benchmark_returns(data, family)
+        backtests[f"{family}_spot_benchmark"] = spot_benchmark_backtest(
+            data, family, cfg["portfolio"]["initial_nav"]
+        )
         candidates = {
-            f"{family}_front": select_nth_expiry(family_data, 1, (family,), carry_column=carry_column),
-            f"{family}_second": select_nth_expiry(family_data, 2, (family,), carry_column=carry_column),
+            f"{family}_front": select_nth_expiry(
+                family_data,
+                1,
+                (family,),
+                carry_column=carry_column,
+                min_volume=strategy["min_volume"],
+                min_open_interest=strategy["min_open_interest"],
+            ),
+            f"{family}_second": select_nth_expiry(
+                family_data,
+                2,
+                (family,),
+                carry_column=carry_column,
+                min_volume=strategy["min_volume"],
+                min_open_interest=strategy["min_open_interest"],
+            ),
             f"{family}_max_carry": select_family_max_carry(
-                family_data, family, strategy["min_dte"], strategy["max_dte"], carry_column
+                family_data,
+                family,
+                strategy["min_dte"],
+                strategy["max_dte"],
+                carry_column,
+                strategy["min_volume"],
+                strategy["min_open_interest"],
             ),
         }
         for name, candidate in candidates.items():
@@ -104,6 +133,8 @@ def main() -> None:
         strategy["min_dte"],
         strategy["max_dte"],
         carry_column,
+        strategy["min_volume"],
+        strategy["min_open_interest"],
     )
     dynamic = _with_roll_policy(dynamic, data, cfg)
     backtests["dynamic_IC_IM_max_carry"] = _run_one("dynamic_IC_IM_max_carry", dynamic, data, cfg)

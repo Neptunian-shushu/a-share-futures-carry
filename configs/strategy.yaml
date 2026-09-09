@@ -6,6 +6,8 @@ strategy:
   max_notional_to_nav: 1.0
   roll_before_expiry_days: 3
   carry_column: signal_carry
+  min_volume: 0
+  min_open_interest: 0
 
 carry:
   day_count: 365

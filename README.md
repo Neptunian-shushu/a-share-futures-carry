@@ -54,12 +54,15 @@ outputs/                    Backtest outputs (gitignored)
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
+pip install -e '.[dev,report]'
 pytest
 python scripts/run_backtest.py --config configs/strategy.yaml
 ```
 
 The synthetic runner keeps the project executable even when no market-data vendor is connected.
+It creates fixed monthly contracts with stable IDs, so the smoke backtest exercises
+continuous holding and real roll events. Add `--data-output outputs/synthetic_panel.csv`
+to export the generated panel for testing the real-data runner.
 
 ## Real historical data with Tushare
 
@@ -98,6 +101,25 @@ The summary is saved to `outputs/strategy_summary.csv`.
 
 If Tushare permissions are unavailable, any vendor/export can be used through the CSV fallback as long as it contains the normalized columns below.
 
+## Free historical data with AkShare
+
+AkShare is an optional provider for CFFEX daily exchange data and CSI index history.
+The adapter normalizes the current public CFFEX daily interface and filters IF/IH/IC/IM
+contracts before joining the corresponding spot index. Install it with:
+
+```bash
+pip install -e '.[akshare]'
+python scripts/download_akshare.py \
+  --families IC IM \
+  --start 20220722 \
+  --end 20260901 \
+  --output data/raw/cffex_panel_akshare.csv
+```
+
+The upstream interface is documented in the [AkShare futures documentation](https://github.com/akfamily/akshare/blob/main/docs/data/futures/futures.md).
+Because free endpoints can change or rate-limit, save downloaded CSV snapshots and
+record the provider/date range alongside research outputs.
+
 ## Normalized data schema
 
 Required columns:
@@ -111,6 +133,16 @@ Required columns:
 - `multiplier`
 
 Useful optional columns include `settle`, `vol`, and `oi`.
+Optional research columns include `funding_rate`, `dividend_yield`, and `margin_rate`.
+
+Validate a panel before using it:
+
+```bash
+python scripts/validate_data.py --data data/raw/cffex_panel.csv
+```
+
+Validation rejects invalid dates, duplicate `(trade_date, contract)` rows, non-positive
+prices/multipliers, negative margin rates, and inconsistent expiry dates.
 
 Recommended research history:
 
@@ -118,13 +150,64 @@ Recommended research history:
 - IC: from 2015
 - IM: from 2022
 
+## Backtest conventions
+
+The engine treats selector output as a signal series. With the default
+`signal_lag_sessions: 1`, a close-based signal from session *t* is executed on the
+next available session using `settle` when supplied, otherwise `futures_close`.
+The previously held contract is marked from the full contract panel on each session,
+including roll days. Exposure is sized in integer contracts, collateral yield accrues
+on free cash, and margin usage is tracked separately from economic notional.
+
+The output includes NAV, futures PnL, collateral PnL, trading costs, turnover, margin,
+free cash, exposure, roll events, and missing-mark diagnostics. Passing only the
+selected rows remains supported for theoretical close-to-close studies, but full-panel
+input is required for accurate roll-day marking.
+
 ## Risk controls
 
-The default research design caps futures notional exposure at 1.0x NAV. Margin availability is **not** treated as permission to lever the equity beta. Production implementation should additionally model variation margin, margin buffers, liquidity, limit moves, roll execution, commissions and slippage.
+The default research design caps futures notional exposure at 1.0x NAV. Margin availability is **not** treated as permission to lever the equity beta. The engine applies a configurable margin rate and buffer, integer sizing, liquidity fields and explicit turnover costs. Production implementation should additionally calibrate exchange-specific margin schedules, limit moves and executable bid/ask spreads.
+
+## Research reports
+
+The real-data runner compares front month, second month, family max-carry, dynamic IC/IM
+max-carry, and historical carry-percentile allocation. It writes:
+
+- `strategy_summary.csv`: return, risk, beta, costs, PnL decomposition, turnover and margin diagnostics
+- `equity_curves.csv` and `monthly_returns.csv`
+- `roll_events.csv`
+- `nav_curves.png`, `drawdowns.png`, `cagr_comparison.png`, and `pnl_decomposition.png`
+
+For example:
+
+```bash
+python scripts/run_real_backtest.py \
+  --data data/raw/cffex_panel.csv \
+  --config configs/strategy.yaml \
+  --output outputs/strategy_summary.csv \
+  --output-dir outputs/research_report
+```
+
+Each family comparison includes a spot-index buy-and-hold benchmark. An ETF can be
+compared by converting its adjusted close series into the same dated return series;
+the current normalized panel intentionally keeps the cash-index benchmark separate
+from dividend-adjusted ETF data.
+
+## Fair-value carry
+
+Set `carry.use_fair_value_adjustment: true` to calculate theoretical futures value from
+funding and dividend yields and select on `excess_carry`. Row-level
+`funding_rate`/`dividend_yield` values take precedence over the scalar config defaults.
+The default configuration keeps observed carry selection for backward compatibility;
+research conclusions should report both versions.
 
 ## Current limitations
 
-The current backtest engine is deliberately minimal. It marks futures close-to-close and adds collateral yield, but it does not yet model daily settlement cash flows, exchange margin schedules, exact CFFEX expiry rules, roll slippage by liquidity, dividend fair value, or realistic integer contract sizing. These are next-stage research items rather than hidden assumptions.
+The engine now models daily settlement-style marking, integer sizing, margin budgets,
+expiry roll windows, configurable costs and fair-value signals. Remaining production
+work is calibration: verify the exact CFFEX holiday-adjusted last trading dates,
+exchange-specific margin schedules, dividend forecasts, bid/ask execution and ETF
+total-return data against an independent source.
 
 ## Roadmap
 
@@ -135,13 +218,20 @@ The current backtest engine is deliberately minimal. It marks futures close-to-c
 - [x] Tushare historical-data provider
 - [x] CSV vendor fallback
 - [x] Real-data strategy comparison runner
-- [ ] Add AkShare/free-data provider
-- [ ] Build robust CFFEX contract calendar and roll rules
-- [ ] Add dividend and funding fair-value model
-- [ ] Add integer sizing and variation-margin accounting
-- [ ] Add spot/ETF buy-and-hold benchmark
-- [ ] Add dynamic carry percentile/z-score allocation
-- [ ] Produce research report and charts
+- [x] Add AkShare/free-data provider
+- [x] Add data-quality validation command
+- [x] Build explicit expiry roll policy
+- [x] Add dividend and funding fair-value model
+- [x] Add integer sizing, daily settlement-style PnL and margin accounting
+- [x] Add spot-index buy-and-hold benchmark
+- [x] Add dynamic carry percentile/z-score allocation
+- [x] Produce research report and charts
+- [x] Add regression tests and GitHub Actions CI
+
+The next research milestone is not another selector: it is a fixed historical data
+snapshot, independent-data reconciliation, walk-forward parameter selection, and
+out-of-sample performance attribution by beta, basis convergence, collateral yield,
+turnover and costs.
 
 ## Disclaimer
 
