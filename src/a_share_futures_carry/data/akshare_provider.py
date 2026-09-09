@@ -98,7 +98,6 @@ class AkshareProvider:
                 period="daily",
                 start_date=start_date,
                 end_date=end_date,
-                adjust="",
             )
         elif hasattr(self.client, "stock_zh_index_daily"):
             raw = self.client.stock_zh_index_daily(symbol=symbol)

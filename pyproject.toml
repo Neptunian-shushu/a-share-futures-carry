@@ -16,9 +16,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
 tushare = ["tushare>=1.4.0"]
-akshare = ["akshare>=1.17.0"]
+akshare = ["akshare>=1.15.0"]
 report = ["matplotlib>=3.7"]
-all = ["pytest>=7.4", "tushare>=1.4.0", "akshare>=1.17.0", "matplotlib>=3.7"]
+all = ["pytest>=7.4", "tushare>=1.4.0", "akshare>=1.15.0", "matplotlib>=3.7"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
