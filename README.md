@@ -127,6 +127,25 @@ By default expiry dates are inferred from the contract month, which is fast and
 deterministic. Add `--with-contract-info` when exact exchange metadata is required; this
 per-day enrichment is slower and may be rate-limited.
 
+## No-Tushare route: official CFFEX monthly archives
+
+For a Tushare-free futures panel, use the direct official CFFEX monthly ZIP archives.
+The project downloads one archive per month, parses all daily CSV files inside it, and
+uses the existing AkShare/Sina fallback only for the corresponding cash index:
+
+```bash
+pip install -e '.[akshare]'
+python scripts/download_cffex_public.py \
+  --families IC IM \
+  --start 20220722 \
+  --end 20260909 \
+  --output data/raw/cffex_panel_cffex_public.csv
+```
+
+Monthly ZIP files are cached locally so an interrupted run can resume without
+redownloading completed months. Expiry dates are inferred from contract months and must
+still be checked against exchange metadata before production use.
+
 ## Normalized data schema
 
 Required columns:

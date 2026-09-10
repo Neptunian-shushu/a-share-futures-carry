@@ -1,5 +1,8 @@
 import pandas as pd
+from io import BytesIO
+import zipfile
 
+from a_share_futures_carry.data.cffex_public_provider import CffexPublicProvider
 from a_share_futures_carry.data.akshare_provider import (
     AkshareProvider,
     _normalize_cffex_daily,
@@ -114,3 +117,33 @@ def test_akshare_provider_ignores_contract_info_endpoint_errors():
     provider = AkshareProvider(client=_BrokenContractInfo())
     info = provider.fetch_contract_info("20260102")
     assert info.empty
+
+
+def test_cffex_public_provider_parses_monthly_zip_without_tushare():
+    raw = pd.DataFrame(
+        {
+            "合约代码": ["IC2501", "IM2501"],
+            "收盘": [5600.0, 6100.0],
+            "结算价": [5598.0, 6098.0],
+            "成交量": [1000, 1200],
+            "持仓量": [2000, 2400],
+        }
+    )
+    payload = BytesIO()
+    with zipfile.ZipFile(payload, "w") as archive:
+        archive.writestr("20250102_1.csv", raw.to_csv(index=False).encode("gb2312"))
+
+    class _FakeIndexProvider:
+        def fetch_index_daily(self, family, start_date, end_date):
+            return pd.DataFrame(
+                {
+                    "trade_date": [pd.Timestamp("2025-01-02")],
+                    "spot_close": [5650.0 if family == "IC" else 6150.0],
+                }
+            )
+
+    provider = CffexPublicProvider(index_provider=_FakeIndexProvider())
+    provider._month_payload = lambda period: payload.getvalue()
+    panel = provider.build_contract_panel(["IC", "IM"], "20250102", "20250102")
+    assert panel["contract"].tolist() == ["IC2501", "IM2501"]
+    assert panel["multiplier"].tolist() == [200.0, 200.0]
