@@ -49,9 +49,9 @@ def price_benchmark_returns(
     )
 
 
-def spot_benchmark_backtest(panel: pd.DataFrame, family: str, initial_nav: float) -> pd.DataFrame:
-    """Build a benchmark-shaped frame so spot performance appears in reports."""
-    returns = spot_benchmark_returns(panel, family)
+def returns_benchmark_backtest(returns: pd.Series, initial_nav: float) -> pd.DataFrame:
+    """Build a benchmark-shaped frame from a dated return series."""
+    returns = pd.Series(returns, dtype=float).sort_index()
     if returns.empty:
         return pd.DataFrame()
     nav = initial_nav * (1.0 + returns).cumprod()
@@ -62,6 +62,29 @@ def spot_benchmark_backtest(panel: pd.DataFrame, family: str, initial_nav: float
             "pnl": nav.diff().fillna(nav - initial_nav).to_numpy(),
             "nav": nav.to_numpy(),
         }
+    )
+
+
+def spot_benchmark_backtest(panel: pd.DataFrame, family: str, initial_nav: float) -> pd.DataFrame:
+    """Build a benchmark-shaped frame so spot performance appears in reports."""
+    return returns_benchmark_backtest(spot_benchmark_returns(panel, family), initial_nav)
+
+
+def price_benchmark_backtest(
+    prices: pd.DataFrame,
+    initial_nav: float,
+    *,
+    date_column: str = "trade_date",
+    price_column: str = "close",
+) -> pd.DataFrame:
+    """Build a benchmark-shaped frame from an ETF or index price series."""
+    return returns_benchmark_backtest(
+        price_benchmark_returns(
+            prices,
+            date_column=date_column,
+            price_column=price_column,
+        ),
+        initial_nav,
     )
 
 

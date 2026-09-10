@@ -118,8 +118,9 @@ python scripts/download_akshare.py \
 
 The upstream interface is documented in the [AkShare futures documentation](https://github.com/akfamily/akshare/blob/main/docs/data/futures/futures.md).
 Because free endpoints can change or rate-limit, save downloaded CSV snapshots and
-the command writes a JSON sidecar containing provider, families, date range, row count
-and generation time. Keep that sidecar with the CSV snapshot.
+the command writes a JSON sidecar containing provider, families, requested and observed
+date ranges, row count, SHA-256 hash and generation time. Keep that sidecar with the CSV
+snapshot.
 
 ## Normalized data schema
 
@@ -199,9 +200,20 @@ python scripts/run_real_backtest.py \
 ```
 
 Each family comparison includes a spot-index buy-and-hold benchmark. An ETF can be
-compared by converting its adjusted close series into the same dated return series;
-the current normalized panel intentionally keeps the cash-index benchmark separate
-from dividend-adjusted ETF data.
+compared by passing a separate dated price CSV; this keeps the cash-index benchmark
+separate from dividend-adjusted ETF data while reporting the ETF on the same date axis:
+
+```bash
+python scripts/run_real_backtest.py \
+  --data data/raw/cffex_panel.csv \
+  --config configs/strategy.yaml \
+  --benchmark data/raw/etf.csv \
+  --benchmark-name CSI500_ETF \
+  --benchmark-price-column adj_close
+```
+
+The benchmark CSV must contain a unique date column (default `trade_date`) and strictly
+positive prices (default `close`).
 
 For parameter selection, run the walk-forward study. Thresholds are selected on each
 training window and evaluated on the following test window:

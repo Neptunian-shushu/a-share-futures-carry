@@ -1,7 +1,7 @@
 import pandas as pd
 
 from a_share_futures_carry.data.reconcile import reconcile_panels
-from a_share_futures_carry.reporting.report import price_benchmark_returns
+from a_share_futures_carry.reporting.report import price_benchmark_backtest, price_benchmark_returns
 
 
 def test_reconcile_panels_reports_price_difference():
@@ -21,3 +21,12 @@ def test_price_benchmark_returns_rejects_duplicate_dates():
         assert "duplicate" in str(exc).lower()
     else:
         raise AssertionError("duplicate benchmark dates should fail")
+
+
+def test_price_benchmark_backtest_preserves_price_series_dates_and_nav():
+    prices = pd.DataFrame(
+        {"trade_date": ["2026-01-02", "2026-01-05"], "close": [100.0, 101.0]}
+    )
+    backtest = price_benchmark_backtest(prices, initial_nav=1_000.0)
+    assert backtest["trade_date"].tolist() == [pd.Timestamp("2026-01-02"), pd.Timestamp("2026-01-05")]
+    assert backtest["nav"].iloc[-1] == 1_010.0

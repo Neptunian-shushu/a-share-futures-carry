@@ -16,6 +16,8 @@ from a_share_futures_carry.backtest.engine import backtest_selected_contracts
 from a_share_futures_carry.data.csv_provider import load_contract_panel_csv
 from a_share_futures_carry.reporting.report import (
     generate_research_report,
+    price_benchmark_backtest,
+    price_benchmark_returns,
     spot_benchmark_backtest,
     spot_benchmark_returns,
 )
@@ -69,6 +71,14 @@ def main() -> None:
     parser.add_argument("--config", default="configs/strategy.yaml")
     parser.add_argument("--output", default="outputs/strategy_summary.csv")
     parser.add_argument("--output-dir", default=None)
+    parser.add_argument(
+        "--benchmark",
+        default=None,
+        help="Optional ETF/index CSV with a dated price series to add to the report",
+    )
+    parser.add_argument("--benchmark-name", default="external_price_benchmark")
+    parser.add_argument("--benchmark-date-column", default="trade_date")
+    parser.add_argument("--benchmark-price-column", default="close")
     args = parser.parse_args()
 
     with Path(args.config).open("r", encoding="utf-8") as f:
@@ -154,6 +164,23 @@ def main() -> None:
         backtests["dynamic_IC_IM_carry_allocation"] = _run_one(
             "dynamic_IC_IM_carry_allocation", dynamic_allocated, data, cfg
         )
+
+    if args.benchmark:
+        benchmark_prices = pd.read_csv(args.benchmark)
+        external_returns = price_benchmark_returns(
+            benchmark_prices,
+            date_column=args.benchmark_date_column,
+            price_column=args.benchmark_price_column,
+        )
+        backtests[args.benchmark_name] = price_benchmark_backtest(
+            benchmark_prices,
+            cfg["portfolio"]["initial_nav"],
+            date_column=args.benchmark_date_column,
+            price_column=args.benchmark_price_column,
+        )
+        for name in list(backtests):
+            if name != args.benchmark_name and not name.endswith("_spot_benchmark"):
+                benchmarks[name] = external_returns
 
     configured_dir = cfg.get("report", {}).get("output_dir", "outputs")
     output_path = Path(args.output)
