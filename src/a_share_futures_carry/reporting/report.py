@@ -177,7 +177,8 @@ def generate_research_report(
     plt.close(fig)
 
     pnl_columns = [
-        "total_futures_pnl",
+        "total_spot_beta_pnl",
+        "total_basis_pnl",
         "total_collateral_pnl",
         "total_trading_cost",
     ]

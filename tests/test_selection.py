@@ -66,3 +66,22 @@ def test_roll_policy_hysteresis_holds_when_new_contract_is_not_better_enough():
     )
     assert rolled["contract"].tolist() == ["IC1", "IC1"]
     assert rolled.loc[1, "roll_reason"] == "hysteresis"
+
+
+def test_roll_policy_keeps_family_when_market_contains_other_families():
+    data = pd.DataFrame(
+        {
+            "trade_date": pd.to_datetime(["2026-01-05"] * 3),
+            "family": ["IF", "IF", "IM"],
+            "contract": ["IF1", "IF2", "IM1"],
+            "expiry_date": pd.to_datetime(["2026-01-06", "2026-02-20", "2026-02-20"]),
+            "dte": [1, 46, 46],
+            "signal_carry": [0.1, 0.2, 1.0],
+        }
+    )
+    rolled = apply_roll_policy(
+        data[data["contract"] == "IF1"], data,
+        roll_before_expiry_days=3, min_dte=5, max_dte=120,
+    )
+    assert rolled.loc[0, "contract"] == "IF2"
+    assert rolled.loc[0, "family"] == "IF"

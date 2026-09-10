@@ -193,6 +193,9 @@ The report compares close, volume and open interest separately, including a
 non-expiry-day exact-match ratio. Any expiry-day or vendor-specific discrepancy remains
 visible in the JSON report for review.
 
+The current reproducible four-family snapshot and its results are summarized in
+[`reports/full_data_research_note.md`](reports/full_data_research_note.md).
+
 Recommended research history:
 
 - IF / IH: full available history
@@ -333,6 +336,7 @@ total-return data against an independent source.
 - [x] Add dynamic carry percentile/z-score allocation
 - [x] Add cost-adjusted selection, rollover hysteresis and volatility targeting
 - [x] Add fixed-holdout, regime, bootstrap and margin/cost stress diagnostics
+- [x] Extend the reproducible snapshot and diagnostics to IF/IH as well as IC/IM
 - [x] Produce research report and charts
 - [x] Add regression tests and GitHub Actions CI
 - [x] Add free ETF benchmark snapshot tooling and price-semantics metadata

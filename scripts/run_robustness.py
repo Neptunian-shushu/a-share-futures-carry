@@ -70,7 +70,7 @@ def _strategies(data: pd.DataFrame, cfg: dict) -> dict[str, pd.DataFrame]:
     carry_column = strategy["carry_column"]
     score_column = strategy.get("selection_score_column", carry_column)
     specs: dict[str, pd.DataFrame] = {}
-    for family in ("IC", "IM"):
+    for family in ("IF", "IH", "IC", "IM"):
         family_data = data[data["family"] == family]
         if family_data.empty:
             continue
@@ -204,7 +204,10 @@ def main() -> None:
 
     stress_rows: list[dict[str, object]] = []
     base_data, base_strategies = prepared_by_mode["observed"]
-    for strategy_name in ("IC_front", "IM_front", "dynamic_IC_IM_max_carry", "dynamic_IC_IM_carry_vol_target"):
+    for strategy_name in (
+        "IF_front", "IH_front", "IC_front", "IM_front",
+        "dynamic_IC_IM_max_carry", "dynamic_IC_IM_carry_vol_target",
+    ):
         selected = base_strategies.get(strategy_name)
         if selected is None:
             continue

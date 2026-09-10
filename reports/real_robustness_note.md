@@ -2,7 +2,7 @@
 
 Snapshot: `data/raw/cffex_panel_cffex_public_ic_im.csv`  
 History: 2022-07-22 to 2026-09-09  
-Final holdout: 252 sessions, 2025-09-09 to 2026-09-09  
+Final holdout: 252 sessions, 2025-08-27 to 2026-09-09  
 Costs: 1 bp per turnover event in the backtest; selection score additionally charges a 2 bp round-trip switch cost annualized over DTE.  
 Bootstrap: 300 resamples, contiguous 20-session blocks, seed 42.
 

@@ -130,12 +130,15 @@ def apply_roll_policy(
         raise ValueError(f"Missing score column: {score_column}")
 
     market = contracts.sort_values(["trade_date", "expiry_date", "contract"]).copy()
+    allowed_families = set(targets["family"].astype(str).str.upper().unique()) if "family" in targets else None
     target_map = targets.sort_values("trade_date").set_index("trade_date")
     rows: list[dict] = []
     held_contract: str | None = None
 
     for date, target in target_map.iterrows():
         day = market[market["trade_date"] == date]
+        if allowed_families is not None and "family" in day:
+            day = day[day["family"].astype(str).str.upper().isin(allowed_families)]
         eligible = day[day["dte"].between(min_dte, max_dte)].copy()
         if min_volume > 0:
             if "vol" not in eligible:
