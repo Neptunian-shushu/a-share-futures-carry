@@ -41,6 +41,18 @@ def test_normalize_legacy_cffex_daily_columns():
     assert result.loc[0, "settle"] == 6233.2
 
 
+def test_observed_expiry_handles_holiday_shifted_last_trade_day():
+    from a_share_futures_carry.data.akshare_provider import _observed_expiry
+
+    panel = pd.DataFrame(
+        {
+            "contract": ["IC2402", "IC2402"],
+            "trade_date": [pd.Timestamp("2024-02-15"), pd.Timestamp("2024-02-19")],
+        }
+    )
+    assert _observed_expiry(panel).tolist() == [pd.Timestamp("2024-02-19")] * 2
+
+
 def test_normalize_akshare_index_history_columns():
     raw = pd.DataFrame({"日期": ["2026-01-02"], "收盘": [6000]})
     result = _normalize_index_history(raw)

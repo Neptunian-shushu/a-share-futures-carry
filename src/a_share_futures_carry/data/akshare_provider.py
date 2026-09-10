@@ -34,6 +34,13 @@ def _contract_expiry(contract: str) -> pd.Timestamp:
     return first + pd.Timedelta(days=days_to_friday + 14)
 
 
+def _observed_expiry(panel: pd.DataFrame) -> pd.Series:
+    """Infer holiday-adjusted last trade dates from observed official rows."""
+    guess = panel["contract"].map(_contract_expiry)
+    observed = pd.to_datetime(panel.groupby("contract")["trade_date"].transform("max"))
+    return pd.concat([guess.rename("guess"), observed.rename("observed")], axis=1).max(axis=1)
+
+
 def _normalize_index_history(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=["trade_date", "spot_close"])
@@ -206,9 +213,11 @@ class AkshareProvider:
         if expiry_frames:
             expiry = pd.concat(expiry_frames, ignore_index=True).drop_duplicates("contract")
             panel = panel.merge(expiry, on="contract", how="left")
+        fallback_expiry = _observed_expiry(panel)
+        if "expiry_date" not in panel:
+            panel["expiry_date"] = fallback_expiry
         else:
-            panel["expiry_date"] = panel["contract"].map(_contract_expiry)
-        panel["expiry_date"] = panel["expiry_date"].fillna(panel["contract"].map(_contract_expiry))
+            panel["expiry_date"] = panel["expiry_date"].fillna(fallback_expiry)
 
         spot_frames = []
         for family in families:

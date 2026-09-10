@@ -18,7 +18,7 @@ import zipfile
 
 import pandas as pd
 
-from .akshare_provider import _contract_expiry, _normalize_cffex_daily
+from .akshare_provider import _observed_expiry, _normalize_cffex_daily
 from .schema import prepare_contract_data
 from .tushare_provider import INDEX_CODE_MAP
 
@@ -144,5 +144,5 @@ class CffexPublicProvider:
             spots.append(spot)
         spot_panel = pd.concat(spots, ignore_index=True)
         panel = futures.merge(spot_panel, on=["trade_date", "family"], how="inner")
-        panel["expiry_date"] = panel["contract"].map(_contract_expiry)
+        panel["expiry_date"] = _observed_expiry(panel)
         return prepare_contract_data(panel)
