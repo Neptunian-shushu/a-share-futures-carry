@@ -179,6 +179,20 @@ python scripts/compare_panels.py \
   --differences-output outputs/panel_differences.csv
 ```
 
+For a field-level independent check, compare selected contracts with Sina's historical
+contract series:
+
+```bash
+python scripts/reconcile_sina_futures.py \
+  --data data/raw/cffex_panel_cffex_public_ic_im.csv \
+  --contracts IC2402 IM2501 \
+  --output outputs/sina_reconciliation.json
+```
+
+The report compares close, volume and open interest separately, including a
+non-expiry-day exact-match ratio. Any expiry-day or vendor-specific discrepancy remains
+visible in the JSON report for review.
+
 Recommended research history:
 
 - IF / IH: full available history
