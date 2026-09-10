@@ -253,6 +253,20 @@ python scripts/run_real_backtest.py \
 The benchmark CSV must contain a unique date column (default `trade_date`) and strictly
 positive prices (default `close`).
 
+Generate a free 510500 benchmark snapshot with:
+
+```bash
+python scripts/download_etf_benchmark.py \
+  --symbol 510500 \
+  --start 20220722 \
+  --end 20260909 \
+  --output data/raw/etf_510500_sina.csv
+```
+
+The Sina endpoint supplies raw close prices. The sidecar records this limitation;
+for a true ETF total-return comparison, replace `close` with a reinvested-distribution
+or adjusted-total-return series and pass that column through `--benchmark-price-column`.
+
 For parameter selection, run the walk-forward study. Thresholds are selected on each
 training window and evaluated on the following test window:
 
@@ -298,6 +312,7 @@ total-return data against an independent source.
 - [x] Add dynamic carry percentile/z-score allocation
 - [x] Produce research report and charts
 - [x] Add regression tests and GitHub Actions CI
+- [x] Add free ETF benchmark snapshot tooling and price-semantics metadata
 
 The next research milestone is not another selector: it is a fixed historical data
 snapshot, independent-data reconciliation, walk-forward parameter selection, and
