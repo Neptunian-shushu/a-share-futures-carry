@@ -24,9 +24,19 @@ def main() -> None:
     parser.add_argument("--end", required=True, help="YYYYMMDD")
     parser.add_argument("--output", default="data/raw/cffex_panel_akshare.csv")
     parser.add_argument("--metadata-output", default=None)
+    parser.add_argument(
+        "--with-contract-info",
+        action="store_true",
+        help="Query CFFEX expiry metadata for every observed date; slower but more exact",
+    )
     args = parser.parse_args()
 
-    panel = AkshareProvider().build_contract_panel(args.families, args.start, args.end)
+    panel = AkshareProvider().build_contract_panel(
+        args.families,
+        args.start,
+        args.end,
+        include_contract_info=args.with_contract_info,
+    )
     if panel.empty:
         raise SystemExit("No data returned. Check AkShare connectivity, dates, and exchange availability.")
     output = Path(args.output)

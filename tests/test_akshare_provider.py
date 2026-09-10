@@ -59,6 +59,33 @@ def test_akshare_provider_builds_normalized_panel_with_fake_client():
     assert panel["spot_close"].tolist() == [6100.0, 6110.0]
 
 
+class _FakeAkshareBulk(_FakeAkshare):
+    def get_futures_daily(self, start_date, end_date, market):
+        assert market == "CFFEX"
+        return pd.DataFrame(
+            {
+                "symbol": ["IC2602", "IO2602"],
+                "date": ["2026-01-02", "2026-01-02"],
+                "close": [6000.0, 10.0],
+                "settle": [5999.0, 9.0],
+                "volume": [1000, 20],
+                "open_interest": [2000, 40],
+            }
+        )
+
+    def get_cffex_daily(self, date):
+        raise AssertionError("bulk interface should be preferred")
+
+
+def test_akshare_provider_prefers_bulk_cffex_history():
+    panel = AkshareProvider(client=_FakeAkshareBulk()).build_contract_panel(
+        ["IC"], "20260102", "20260102"
+    )
+    assert len(panel) == 1
+    assert panel.loc[0, "contract"] == "IC2602"
+    assert panel.loc[0, "expiry_date"] == pd.Timestamp("2026-02-20")
+
+
 class _FakeAkshareSinaFallback(_FakeAkshare):
     def index_zh_a_hist(self, symbol, period, start_date, end_date):
         raise RuntimeError("primary index endpoint unavailable")

@@ -104,8 +104,9 @@ If Tushare permissions are unavailable, any vendor/export can be used through th
 ## Free historical data with AkShare
 
 AkShare is an optional provider for CFFEX daily exchange data and CSI index history.
-The adapter normalizes the current public CFFEX daily interface and filters IF/IH/IC/IM
-contracts before joining the corresponding spot index. Install it with:
+The adapter prefers the public date-range CFFEX interface, falls back to the older
+one-day interface when needed, and filters IF/IH/IC/IM contracts before joining the
+corresponding spot index. Install it with:
 
 ```bash
 pip install -e '.[akshare]'
@@ -121,6 +122,10 @@ Because free endpoints can change or rate-limit, save downloaded CSV snapshots a
 the command writes a JSON sidecar containing provider, families, requested and observed
 date ranges, row count, SHA-256 hash and generation time. Keep that sidecar with the CSV
 snapshot.
+
+By default expiry dates are inferred from the contract month, which is fast and
+deterministic. Add `--with-contract-info` when exact exchange metadata is required; this
+per-day enrichment is slower and may be rate-limited.
 
 ## Normalized data schema
 

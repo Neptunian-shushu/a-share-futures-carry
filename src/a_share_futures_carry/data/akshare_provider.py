@@ -48,7 +48,7 @@ def _normalize_index_history(df: pd.DataFrame) -> pd.DataFrame:
     return out.dropna().sort_values("trade_date").reset_index(drop=True)
 
 
-def _normalize_cffex_daily(df: pd.DataFrame, trade_date: str) -> pd.DataFrame:
+def _normalize_cffex_daily(df: pd.DataFrame, trade_date: str | None = None) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame()
     symbol_column = _first_column(df, ("symbol", "合约代码", "合约"))
@@ -57,7 +57,13 @@ def _normalize_cffex_daily(df: pd.DataFrame, trade_date: str) -> pd.DataFrame:
         raise ValueError("AkShare CFFEX data lacks contract or close columns")
     out = pd.DataFrame()
     out["contract"] = df[symbol_column].astype(str).str.strip().str.upper()
-    out["trade_date"] = pd.Timestamp(trade_date)
+    date_column = _first_column(df, ("date", "日期", "trade_date"))
+    if date_column is None:
+        if trade_date is None:
+            raise ValueError("CFFEX data lacks a trade date")
+        out["trade_date"] = pd.Timestamp(trade_date)
+    else:
+        out["trade_date"] = pd.to_datetime(df[date_column], errors="coerce")
     out["futures_close"] = pd.to_numeric(df[close_column], errors="coerce")
     settle_column = _first_column(df, ("settle", "结算", "结算价"))
     volume_column = _first_column(df, ("volume", "成交量", "成交量(手)"))
@@ -145,27 +151,56 @@ class AkshareProvider:
         families: Iterable[str],
         start_date: str,
         end_date: str,
+        include_contract_info: bool = False,
     ) -> pd.DataFrame:
         families = tuple(str(f).upper() for f in families)
         invalid = set(families).difference(INDEX_CODE_MAP)
         if invalid:
             raise ValueError(f"Unsupported futures families: {sorted(invalid)}")
 
-        dates = pd.date_range(start_date, end_date, freq="D")
         daily_frames: list[pd.DataFrame] = []
         expiry_frames: list[pd.DataFrame] = []
-        for date in dates:
-            date_text = date.strftime("%Y%m%d")
-            raw = self.client.get_cffex_daily(date=date_text)
-            day = _normalize_cffex_daily(raw, date_text)
-            if day.empty:
-                continue
-            daily_frames.append(day[day["family"].isin(families)])
-            info = self.fetch_contract_info(date_text)
-            if not info.empty:
-                expiry_frames.append(info)
+        bulk_loaded = False
+        if hasattr(self.client, "get_futures_daily"):
+            try:
+                raw = self.client.get_futures_daily(
+                    start_date=start_date,
+                    end_date=end_date,
+                    market="CFFEX",
+                )
+                bulk = _normalize_cffex_daily(raw)
+                bulk = bulk[bulk["family"].isin(families)].copy()
+                if not bulk.empty:
+                    daily_frames.append(bulk)
+                    bulk_loaded = True
+            except Exception:
+                # Fall back to the older one-day interface below.
+                pass
+
+        if not bulk_loaded:
+            dates = pd.date_range(start_date, end_date, freq="D")
+            for date in dates:
+                date_text = date.strftime("%Y%m%d")
+                raw = self.client.get_cffex_daily(date=date_text)
+                day = _normalize_cffex_daily(raw, date_text)
+                if day.empty:
+                    continue
+                daily_frames.append(day[day["family"].isin(families)])
+
         if not daily_frames:
             return pd.DataFrame()
+
+        if include_contract_info:
+            info_dates = (
+                pd.to_datetime(daily_frames[0]["trade_date"])
+                .drop_duplicates()
+                .sort_values()
+                .dt.strftime("%Y%m%d")
+            )
+            for date_text in info_dates:
+                info = self.fetch_contract_info(date_text)
+                if not info.empty:
+                    expiry_frames.append(info)
 
         panel = pd.concat(daily_frames, ignore_index=True)
         if expiry_frames:
