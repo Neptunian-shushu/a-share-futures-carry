@@ -278,6 +278,22 @@ python scripts/run_walk_forward.py \
   --thresholds 0.3 0.5 0.7
 ```
 
+Run the stronger fixed-holdout and implementation-robustness study with:
+
+```bash
+python scripts/run_robustness.py \
+  --data data/raw/cffex_panel_cffex_public_ic_im.csv \
+  --config configs/strategy.yaml \
+  --test-sessions 252 \
+  --bootstrap 500 \
+  --output-dir outputs/robustness
+```
+
+This keeps the final 252 sessions untouched by parameter selection, compares
+observed versus fair-value carry, reports up/down-market regimes, runs a seeded
+block bootstrap, and stresses transaction costs and margin rates. It is intended
+to expose fragility rather than to manufacture a single best configuration.
+
 ## Fair-value carry
 
 Set `carry.use_fair_value_adjustment: true` to calculate theoretical futures value from
@@ -310,6 +326,8 @@ total-return data against an independent source.
 - [x] Add integer sizing, daily settlement-style PnL and margin accounting
 - [x] Add spot-index buy-and-hold benchmark
 - [x] Add dynamic carry percentile/z-score allocation
+- [x] Add cost-adjusted selection, rollover hysteresis and volatility targeting
+- [x] Add fixed-holdout, regime, bootstrap and margin/cost stress diagnostics
 - [x] Produce research report and charts
 - [x] Add regression tests and GitHub Actions CI
 - [x] Add free ETF benchmark snapshot tooling and price-semantics metadata
