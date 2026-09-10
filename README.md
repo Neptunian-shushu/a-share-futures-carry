@@ -274,9 +274,14 @@ training window and evaluated on the following test window:
 python scripts/run_walk_forward.py \
   --data data/raw/cffex_panel.csv \
   --train-sessions 252 \
+  --validation-sessions 63 \
   --test-sessions 63 \
   --thresholds 0.3 0.5 0.7
 ```
+
+With validation enabled, each window uses train → validation → test ordering and
+keeps the full portfolio path when reporting the test segment. This avoids selecting
+parameters on the test period and avoids resetting positions at every test boundary.
 
 Run the stronger fixed-holdout and implementation-robustness study with:
 

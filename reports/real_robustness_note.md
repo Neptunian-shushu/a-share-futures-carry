@@ -42,3 +42,15 @@ Machine-readable outputs are written to `outputs/real_robustness/`:
 - `fixed_holdout_summary.csv`
 - `regime_summary.csv`
 - `implementation_stress.csv`
+
+## Strict three-way walk-forward
+
+The stricter walk-forward run used 252 training sessions, 63 validation sessions,
+63 test sessions, a 63-session step, and thresholds `0.3/0.5/0.7`. It produced 10
+out-of-sample windows: 6 had positive returns, mean test return was 1.91%, median
+test return was 2.37%, mean test Sharpe was 0.658, and the worst test return was
+-5.17%. Each window ran the full history before slicing the evaluation period, so
+the portfolio did not reset to zero at the test boundary and the one-session
+execution lag remained active.
+
+The machine-readable result is `outputs/real_walk_forward_strict_summary.csv`.

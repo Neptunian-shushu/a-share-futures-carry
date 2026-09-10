@@ -83,13 +83,29 @@ def _run(selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     )
 
 
+def _run_period(
+    selected: pd.DataFrame,
+    data: pd.DataFrame,
+    cfg: dict,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+) -> pd.DataFrame:
+    """Run the full history, then retain a period without resetting the portfolio."""
+    full = _run(selected, data, cfg)
+    if full.empty:
+        return full
+    dates = pd.to_datetime(full["trade_date"])
+    return full[dates.between(start, end)].copy().reset_index(drop=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
     parser.add_argument("--config", default="configs/strategy.yaml")
     parser.add_argument("--output", default="outputs/walk_forward_summary.csv")
-    parser.add_argument("--train-sessions", type=int, default=60)
-    parser.add_argument("--test-sessions", type=int, default=30)
+    parser.add_argument("--train-sessions", type=int, default=252)
+    parser.add_argument("--validation-sessions", type=int, default=63)
+    parser.add_argument("--test-sessions", type=int, default=63)
     parser.add_argument("--step-sessions", type=int, default=None)
     parser.add_argument("--thresholds", nargs="+", type=float, default=[0.3, 0.5, 0.7])
     args = parser.parse_args()
@@ -98,14 +114,15 @@ def main() -> None:
         cfg = yaml.safe_load(f)
     data, selected = _prepare(load_contract_panel_csv(args.data), cfg)
     windows = make_walk_forward_windows(
-        selected["trade_date"], args.train_sessions, args.test_sessions, args.step_sessions
+        selected["trade_date"], args.train_sessions, args.test_sessions,
+        args.step_sessions, args.validation_sessions,
     )
     allocation = cfg.get("allocation", {})
     rows: list[dict[str, object]] = []
 
     for window_id, window in enumerate(windows, start=1):
-        train_mask = selected["trade_date"].between(window.train_start, window.train_end)
-        test_mask = selected["trade_date"].between(window.train_end, window.test_end)
+        validation_start = window.validation_start or window.train_start
+        validation_end = window.validation_end or window.train_end
         candidate_scores: list[tuple[float, float]] = []
         for threshold in args.thresholds:
             allocated = add_dynamic_carry_allocation(
@@ -118,12 +135,8 @@ def main() -> None:
                 zscore_scale=allocation.get("zscore_scale", 1.0),
                 max_weight=allocation.get("max_weight", 1.0),
             )
-            train_bt = _run(
-                allocated[train_mask],
-                data[data["trade_date"].between(window.train_start, window.train_end)],
-                cfg,
-            )
-            score = summarize_backtest(train_bt).get("sharpe", np.nan) if not train_bt.empty else np.nan
+            validation_bt = _run_period(allocated, data, cfg, validation_start, validation_end)
+            score = summarize_backtest(validation_bt).get("sharpe", np.nan) if not validation_bt.empty else np.nan
             candidate_scores.append((threshold, float(score)))
 
         finite_scores = [(threshold, score) for threshold, score in candidate_scores if np.isfinite(score)]
@@ -138,12 +151,9 @@ def main() -> None:
             zscore_scale=allocation.get("zscore_scale", 1.0),
             max_weight=allocation.get("max_weight", 1.0),
         )
-        test_bt = _run(
-            allocated[test_mask],
-            data[data["trade_date"].between(window.train_end, window.test_end)],
-            cfg,
-        )
+        test_bt = _run_period(allocated, data, cfg, window.test_start, window.test_end)
         test_summary = summarize_backtest(test_bt) if not test_bt.empty else {}
+        validation_scores = dict(candidate_scores)
         rows.append(
             {
                 "window": window_id,
@@ -152,7 +162,10 @@ def main() -> None:
                 "test_start": window.test_start,
                 "test_end": window.test_end,
                 "chosen_threshold": chosen_threshold,
-                "train_best_sharpe": max((score for _, score in candidate_scores if np.isfinite(score)), default=np.nan),
+                "validation_start": validation_start,
+                "validation_end": validation_end,
+                "validation_best_sharpe": max((score for _, score in candidate_scores if np.isfinite(score)), default=np.nan),
+                "chosen_validation_sharpe": validation_scores.get(chosen_threshold, np.nan),
                 "test_sharpe": test_summary.get("sharpe", np.nan),
                 "test_cagr": test_summary.get("cagr", np.nan),
                 "test_total_return": test_summary.get("total_return", np.nan),

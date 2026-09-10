@@ -15,6 +15,8 @@ class WalkForwardWindow:
     train_end: pd.Timestamp
     test_start: pd.Timestamp
     test_end: pd.Timestamp
+    validation_start: pd.Timestamp | None = None
+    validation_end: pd.Timestamp | None = None
 
 
 def make_walk_forward_windows(
@@ -22,25 +24,33 @@ def make_walk_forward_windows(
     train_sessions: int = 252,
     test_sessions: int = 63,
     step_sessions: int | None = None,
+    validation_sessions: int = 0,
 ) -> list[WalkForwardWindow]:
-    """Create non-overlapping test windows from an ordered session calendar."""
+    """Create train/validation/test windows from an ordered session calendar."""
     if train_sessions < 2 or test_sessions < 1:
         raise ValueError("train_sessions must be >= 2 and test_sessions must be >= 1")
+    if validation_sessions < 0:
+        raise ValueError("validation_sessions must be >= 0")
     step = step_sessions or test_sessions
     if step < 1:
         raise ValueError("step_sessions must be >= 1")
     calendar = pd.DatetimeIndex(pd.to_datetime(dates)).drop_duplicates().sort_values()
     windows: list[WalkForwardWindow] = []
     start = 0
-    while start + train_sessions + test_sessions <= len(calendar):
+    total_sessions = train_sessions + validation_sessions + test_sessions
+    while start + total_sessions <= len(calendar):
         train = calendar[start : start + train_sessions]
-        test = calendar[start + train_sessions : start + train_sessions + test_sessions]
+        validation = calendar[start + train_sessions : start + train_sessions + validation_sessions]
+        test_start_index = start + train_sessions + validation_sessions
+        test = calendar[test_start_index : test_start_index + test_sessions]
         windows.append(
             WalkForwardWindow(
                 train_start=train[0],
                 train_end=train[-1],
                 test_start=test[0],
                 test_end=test[-1],
+                validation_start=validation[0] if validation_sessions else None,
+                validation_end=validation[-1] if validation_sessions else None,
             )
         )
         start += step
