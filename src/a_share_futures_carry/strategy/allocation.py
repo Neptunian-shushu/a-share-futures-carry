@@ -61,3 +61,46 @@ def add_dynamic_carry_allocation(
         weight = (score - entry_threshold) / zscore_scale
     out["target_weight"] = weight.clip(lower=0, upper=max_weight).fillna(0.0)
     return out
+
+
+def add_volatility_target_allocation(
+    selected: pd.DataFrame,
+    *,
+    target_vol_annual: float = 0.10,
+    lookback: int = 60,
+    min_periods: int = 20,
+    price_column: str = "spot_close",
+    base_weight_column: str = "target_weight",
+    max_weight: float = 1.0,
+    periods_per_year: int = 252,
+) -> pd.DataFrame:
+    """Scale an existing allocation by inverse realized spot volatility.
+
+    Volatility is calculated only from prices available on each signal date;
+    the backtest execution lag therefore prevents same-day look-ahead.  If a
+    base weight exists (for example, a carry percentile gate), the volatility
+    scaler is applied on top of it.
+    """
+    if target_vol_annual <= 0:
+        raise ValueError("target_vol_annual must be positive")
+    if lookback < 2 or min_periods < 2 or min_periods > lookback:
+        raise ValueError("Require 2 <= min_periods <= lookback")
+    if max_weight < 0 or periods_per_year <= 0:
+        raise ValueError("max_weight must be non-negative and periods_per_year must be positive")
+    if price_column not in selected:
+        raise ValueError(f"Missing price column: {price_column}")
+
+    out = selected.sort_values("trade_date").copy().reset_index(drop=True)
+    prices = pd.to_numeric(out[price_column], errors="coerce")
+    returns = prices.pct_change()
+    realized_vol = returns.rolling(lookback, min_periods=min_periods).std(ddof=0) * np.sqrt(periods_per_year)
+    scaler = (target_vol_annual / realized_vol.replace(0, np.nan)).clip(lower=0, upper=max_weight)
+    base_weight = (
+        pd.to_numeric(out[base_weight_column], errors="coerce").fillna(0.0)
+        if base_weight_column in out
+        else pd.Series(1.0, index=out.index)
+    )
+    out["realized_vol"] = realized_vol
+    out["vol_target_scale"] = scaler
+    out["target_weight"] = (base_weight * scaler).clip(lower=0, upper=max_weight).fillna(0.0)
+    return out

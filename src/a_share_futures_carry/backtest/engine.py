@@ -132,7 +132,14 @@ def backtest_selected_contracts(
     signal_contract = signal_index["contract"].reindex(calendar).ffill().shift(effective_lag)
     signal_date = raw_signal_date.shift(effective_lag).where(signal_contract.notna())
     signal_values: dict[str, pd.Series] = {}
-    for column in ("carry_ann", "signal_carry", "carry_percentile", "carry_zscore", "target_weight"):
+    for column in (
+        "carry_ann",
+        "signal_carry",
+        "selection_score",
+        "carry_percentile",
+        "carry_zscore",
+        "target_weight",
+    ):
         if column in signal_index:
             signal_values[column] = signal_index[column].reindex(calendar).ffill().shift(effective_lag)
 
@@ -143,6 +150,7 @@ def backtest_selected_contracts(
     previous_multiplier = 0.0
     previous_contracts = 0.0
     previous_margin = 0.0
+    previous_spot_price: float | None = None
     rows: list[dict[str, object]] = []
 
     for date in calendar:
@@ -161,6 +169,22 @@ def backtest_selected_contracts(
         else:
             held_price = None
             futures_pnl = 0.0
+
+        spot_price = None
+        for spot_row in (held_row, target_row):
+            if spot_row is not None and "spot_close" in spot_row.index and pd.notna(spot_row["spot_close"]):
+                value = float(spot_row["spot_close"])
+                if value > 0:
+                    spot_price = value
+                    break
+        spot_beta_pnl = (
+            previous_contracts * previous_multiplier * (spot_price - previous_spot_price)
+            if previous_contract is not None
+            and previous_spot_price is not None
+            and spot_price is not None
+            else 0.0
+        )
+        basis_pnl = futures_pnl - spot_beta_pnl
 
         days = 0 if previous_date is None else max((date - previous_date).days, 1)
         collateral_base = max(nav - previous_margin, 0.0)
@@ -220,12 +244,15 @@ def backtest_selected_contracts(
             "family": target_row.get("family") if target_row is not None else None,
             "carry_ann": signal_values["carry_ann"].loc[date] if "carry_ann" in signal_values else None,
             "signal_carry": signal_values["signal_carry"].loc[date] if "signal_carry" in signal_values else None,
+            "selection_score": signal_values["selection_score"].loc[date] if "selection_score" in signal_values else None,
             "target_weight": target_weight,
             "margin_rate": target_margin_rate,
             "contracts": new_contracts,
             "notional": abs(new_contracts * (target_price or 0.0) * target_multiplier),
             "exposure_to_nav": abs(new_contracts * (target_price or 0.0) * target_multiplier) / nav if nav else 0.0,
             "futures_pnl": futures_pnl,
+            "spot_beta_pnl": spot_beta_pnl,
+            "basis_pnl": basis_pnl,
             "collateral_pnl": collateral_pnl,
             "trading_cost": trading_cost,
             "turnover_notional": turnover_notional,
@@ -245,6 +272,7 @@ def backtest_selected_contracts(
         previous_multiplier = target_multiplier if target_position_contract is not None else 0.0
         previous_contracts = new_contracts
         previous_margin = margin_used
+        previous_spot_price = spot_price if target_position_contract is not None else None
 
     result = pd.DataFrame(rows)
     result["pnl"] = result["futures_pnl"] + result["collateral_pnl"] - result["trading_cost"]

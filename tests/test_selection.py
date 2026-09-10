@@ -42,3 +42,27 @@ def test_roll_policy_does_not_pull_position_back_to_near_expiry_contract():
     rolled = apply_roll_policy(targets, data, roll_before_expiry_days=3, min_dte=5, max_dte=120)
     assert rolled["contract"].tolist() == ["IC2", "IC2", "IC2"]
     assert rolled.loc[0, "roll_reason"] == "unavailable"
+
+
+def test_roll_policy_hysteresis_holds_when_new_contract_is_not_better_enough():
+    data = pd.DataFrame(
+        {
+            "trade_date": pd.to_datetime(["2026-01-05"] * 2 + ["2026-01-06"] * 2),
+            "family": ["IC"] * 4,
+            "contract": ["IC1", "IC2"] * 2,
+            "expiry_date": pd.to_datetime(["2026-03-20", "2026-04-17"] * 2),
+            "dte": [74, 102, 73, 101],
+            "signal_carry": [0.05, 0.0502, 0.05, 0.0502],
+        }
+    )
+    targets = data[data["contract"] == "IC1"].copy()
+    targets.loc[targets["trade_date"] == pd.Timestamp("2026-01-06"), "contract"] = "IC2"
+    rolled = apply_roll_policy(
+        targets,
+        data,
+        min_dte=5,
+        max_dte=180,
+        min_score_improvement=0.001,
+    )
+    assert rolled["contract"].tolist() == ["IC1", "IC1"]
+    assert rolled.loc[1, "roll_reason"] == "hysteresis"

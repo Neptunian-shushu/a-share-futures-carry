@@ -6,6 +6,9 @@ strategy:
   max_notional_to_nav: 1.0
   roll_before_expiry_days: 3
   carry_column: signal_carry
+  selection_score_column: selection_score
+  switch_cost_bps: 2.0
+  roll_score_buffer: 0.0005
   min_volume: 0
   min_open_interest: 0
 
@@ -35,6 +38,11 @@ allocation:
   entry_threshold: 0.5
   zscore_scale: 1.0
   max_weight: 1.0
+  vol_target_enabled: true
+  target_vol_annual: 0.10
+  vol_lookback: 60
+  vol_min_periods: 20
+  vol_price_column: spot_close
 
 report:
   output_dir: outputs

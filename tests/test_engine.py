@@ -44,6 +44,8 @@ def test_continuous_contract_generates_daily_pnl_and_integer_size():
     assert result["contracts"].map(float.is_integer).all()
     assert result.loc[1, "futures_pnl"] == 1_000.0
     assert result.loc[2, "futures_pnl"] == -455.0
+    assert result.loc[1, "spot_beta_pnl"] == 0.0
+    assert result.loc[1, "basis_pnl"] == result.loc[1, "futures_pnl"]
     assert not result["roll_event"].any()
 
 

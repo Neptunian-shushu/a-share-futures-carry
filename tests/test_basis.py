@@ -1,6 +1,6 @@
 import pandas as pd
 
-from a_share_futures_carry.signals.basis import add_carry_columns, annualized_discount
+from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry, annualized_discount
 
 
 def test_annualized_discount_positive_for_discounted_future():
@@ -29,3 +29,10 @@ def test_fair_value_adjustment_creates_excess_carry():
     assert result.loc[0, "fair_value_futures"] > 100.0
     assert result.loc[0, "excess_carry"] > result.loc[0, "carry_ann"]
     assert result.loc[0, "signal_carry"] == result.loc[0, "excess_carry"]
+
+
+def test_cost_adjusted_carry_penalizes_short_dte_more():
+    data = pd.DataFrame({"signal_carry": [0.05, 0.05], "dte": [10, 60]})
+    result = add_cost_adjusted_carry(data, switch_cost_bps=2.0)
+    assert result.loc[0, "selection_score"] < result.loc[1, "selection_score"]
+    assert result.loc[0, "switch_cost_ann"] > result.loc[1, "switch_cost_ann"]

@@ -17,7 +17,7 @@ from a_share_futures_carry.backtest.engine import backtest_selected_contracts
 from a_share_futures_carry.data.csv_provider import load_contract_panel_csv
 from a_share_futures_carry.metrics.performance import summarize_backtest
 from a_share_futures_carry.research.walk_forward import make_walk_forward_windows
-from a_share_futures_carry.signals.basis import add_carry_columns
+from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry
 from a_share_futures_carry.strategy.allocation import add_dynamic_carry_allocation
 from a_share_futures_carry.strategy.selection import apply_roll_policy, select_max_carry
 
@@ -32,12 +32,20 @@ def _prepare(data: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
         funding_rate_annual=carry["funding_rate_annual"],
         dividend_yield_annual=carry["dividend_yield_annual"],
     )
+    data = add_cost_adjusted_carry(
+        data,
+        carry_column=strategy["carry_column"],
+        switch_cost_bps=strategy.get("switch_cost_bps", 0.0),
+        day_count=carry["day_count"],
+        output_column=strategy.get("selection_score_column", strategy["carry_column"]),
+    )
+    selection_score_column = strategy.get("selection_score_column", strategy["carry_column"])
     selected = select_max_carry(
         data,
         tuple(strategy["eligible_families"]),
         strategy["min_dte"],
         strategy["max_dte"],
-        strategy["carry_column"],
+        selection_score_column,
         strategy["min_volume"],
         strategy["min_open_interest"],
     )
@@ -47,9 +55,10 @@ def _prepare(data: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
         strategy["roll_before_expiry_days"],
         strategy["min_dte"],
         strategy["max_dte"],
-        strategy["carry_column"],
+        strategy.get("roll_score_column", selection_score_column),
         strategy["min_volume"],
         strategy["min_open_interest"],
+        strategy.get("roll_score_buffer", 0.0),
     )
     return data, selected
 

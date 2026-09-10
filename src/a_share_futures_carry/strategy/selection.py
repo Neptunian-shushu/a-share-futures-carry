@@ -107,6 +107,7 @@ def apply_roll_policy(
     score_column: str = "signal_carry",
     min_volume: float = 0.0,
     min_open_interest: float = 0.0,
+    min_score_improvement: float = 0.0,
 ) -> pd.DataFrame:
     """Apply a deterministic expiry-roll rule to a daily target series.
 
@@ -117,6 +118,8 @@ def apply_roll_policy(
     """
     if roll_before_expiry_days < 0:
         raise ValueError("roll_before_expiry_days must be >= 0")
+    if min_score_improvement < 0:
+        raise ValueError("min_score_improvement must be non-negative")
     if targets.empty:
         return targets.copy()
     if targets["trade_date"].duplicated().any():
@@ -169,7 +172,21 @@ def apply_roll_policy(
                 chosen = current.iloc[0]
                 reason = "hold_min_dte"
             elif candidate_is_eligible:
-                chosen = candidate.iloc[0]
+                candidate_row = candidate.iloc[0]
+                if not current.empty and str(candidate_contract) != held_contract:
+                    current_score = pd.to_numeric(current.iloc[0][score_column], errors="coerce")
+                    candidate_score = pd.to_numeric(candidate_row[score_column], errors="coerce")
+                    if (
+                        pd.notna(current_score)
+                        and pd.notna(candidate_score)
+                        and candidate_score < current_score + min_score_improvement
+                    ):
+                        chosen = current.iloc[0]
+                        reason = "hysteresis"
+                    else:
+                        chosen = candidate_row
+                else:
+                    chosen = candidate_row
             elif not eligible.empty:
                 chosen = eligible.sort_values(
                     [score_column, "expiry_date", "contract"],

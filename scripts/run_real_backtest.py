@@ -21,8 +21,8 @@ from a_share_futures_carry.reporting.report import (
     spot_benchmark_backtest,
     spot_benchmark_returns,
 )
-from a_share_futures_carry.signals.basis import add_carry_columns
-from a_share_futures_carry.strategy.allocation import add_dynamic_carry_allocation
+from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry
+from a_share_futures_carry.strategy.allocation import add_dynamic_carry_allocation, add_volatility_target_allocation
 from a_share_futures_carry.strategy.selection import (
     apply_roll_policy,
     select_family_max_carry,
@@ -39,9 +39,10 @@ def _with_roll_policy(selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -> 
         strategy["roll_before_expiry_days"],
         strategy["min_dte"],
         strategy["max_dte"],
-        strategy["carry_column"],
+        strategy.get("roll_score_column", strategy.get("selection_score_column", strategy["carry_column"])),
         strategy["min_volume"],
         strategy["min_open_interest"],
+        strategy.get("roll_score_buffer", 0.0),
     )
 
 
@@ -79,6 +80,12 @@ def main() -> None:
     parser.add_argument("--benchmark-name", default="external_price_benchmark")
     parser.add_argument("--benchmark-date-column", default="trade_date")
     parser.add_argument("--benchmark-price-column", default="close")
+    parser.add_argument(
+        "--carry-mode",
+        choices=("config", "observed", "fair"),
+        default="config",
+        help="Use configured, observed, or fair-value-adjusted carry",
+    )
     args = parser.parse_args()
 
     with Path(args.config).open("r", encoding="utf-8") as f:
@@ -86,15 +93,28 @@ def main() -> None:
 
     data = load_contract_panel_csv(args.data)
     carry_cfg = cfg["carry"]
+    use_fair_value = carry_cfg["use_fair_value_adjustment"]
+    if args.carry_mode == "observed":
+        use_fair_value = False
+    elif args.carry_mode == "fair":
+        use_fair_value = True
     data = add_carry_columns(
         data,
         carry_cfg["day_count"],
-        use_fair_value_adjustment=carry_cfg["use_fair_value_adjustment"],
+        use_fair_value_adjustment=use_fair_value,
         funding_rate_annual=carry_cfg["funding_rate_annual"],
         dividend_yield_annual=carry_cfg["dividend_yield_annual"],
     )
     strategy = cfg["strategy"]
     carry_column = strategy["carry_column"]
+    selection_score_column = strategy.get("selection_score_column", carry_column)
+    data = add_cost_adjusted_carry(
+        data,
+        carry_column=carry_column,
+        switch_cost_bps=strategy.get("switch_cost_bps", 0.0),
+        day_count=carry_cfg["day_count"],
+        output_column=selection_score_column,
+    )
     backtests: dict[str, pd.DataFrame] = {}
     benchmarks: dict[str, pd.Series] = {}
 
@@ -128,7 +148,7 @@ def main() -> None:
                 family,
                 strategy["min_dte"],
                 strategy["max_dte"],
-                carry_column,
+                selection_score_column,
                 strategy["min_volume"],
                 strategy["min_open_interest"],
             ),
@@ -142,7 +162,7 @@ def main() -> None:
         tuple(strategy["eligible_families"]),
         strategy["min_dte"],
         strategy["max_dte"],
-        carry_column,
+        selection_score_column,
         strategy["min_volume"],
         strategy["min_open_interest"],
     )
@@ -164,6 +184,19 @@ def main() -> None:
         backtests["dynamic_IC_IM_carry_allocation"] = _run_one(
             "dynamic_IC_IM_carry_allocation", dynamic_allocated, data, cfg
         )
+        if allocation_cfg.get("vol_target_enabled", False):
+            dynamic_vol_targeted = add_volatility_target_allocation(
+                dynamic_allocated,
+                target_vol_annual=allocation_cfg.get("target_vol_annual", 0.10),
+                lookback=allocation_cfg.get("vol_lookback", allocation_cfg["lookback"]),
+                min_periods=allocation_cfg.get("vol_min_periods", allocation_cfg["min_periods"]),
+                price_column=allocation_cfg.get("vol_price_column", "spot_close"),
+                max_weight=allocation_cfg.get("max_weight", 1.0),
+                periods_per_year=carry_cfg.get("trading_days_per_year", 252),
+            )
+            backtests["dynamic_IC_IM_carry_vol_target"] = _run_one(
+                "dynamic_IC_IM_carry_vol_target", dynamic_vol_targeted, data, cfg
+            )
 
     if args.benchmark:
         benchmark_prices = pd.read_csv(args.benchmark)

@@ -132,6 +132,8 @@ def summarize_backtest(
         ("turnover_notional", "total_turnover_notional"),
         ("trading_cost", "total_trading_cost"),
         ("futures_pnl", "total_futures_pnl"),
+        ("spot_beta_pnl", "total_spot_beta_pnl"),
+        ("basis_pnl", "total_basis_pnl"),
         ("collateral_pnl", "total_collateral_pnl"),
     ):
         if column in backtest:
