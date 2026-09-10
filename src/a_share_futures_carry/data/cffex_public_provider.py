@@ -7,7 +7,7 @@ the cash-index leg to the existing AkShare/Sina fallback provider.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO, StringIO
 from pathlib import Path
@@ -40,6 +40,7 @@ class CffexPublicProvider:
     cache_dir: str | Path | None = None
     timeout: int = 30
     workers: int = 4
+    last_errors: list[str] = field(init=False, default_factory=list)
 
     def __post_init__(self) -> None:
         if self.workers < 1:
@@ -118,6 +119,7 @@ class CffexPublicProvider:
                     continue
                 if not month.empty:
                     frames[period] = month
+        self.last_errors = sorted(errors)
         if not frames:
             detail = "; ".join(errors[:3])
             raise RuntimeError(f"No CFFEX public data returned. {detail}")

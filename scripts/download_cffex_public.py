@@ -27,7 +27,8 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 
-    panel = CffexPublicProvider(cache_dir=args.cache_dir, workers=args.workers).build_contract_panel(
+    provider = CffexPublicProvider(cache_dir=args.cache_dir, workers=args.workers)
+    panel = provider.build_contract_panel(
         args.families, args.start, args.end
     )
     if panel.empty:
@@ -44,12 +45,15 @@ def main() -> None:
         "observed_start_date": observed_dates.min().strftime("%Y-%m-%d"),
         "observed_end_date": observed_dates.max().strftime("%Y-%m-%d"),
         "rows": len(panel),
+        "download_errors": provider.last_errors,
         "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
     }
     metadata_output = output.with_suffix(output.suffix + ".json")
     metadata_output.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"Saved {len(panel):,} rows to {output}")
+    if provider.last_errors:
+        print(f"Warning: {len(provider.last_errors)} monthly archives were unavailable")
     print(f"Saved metadata to {metadata_output}")
 
 
