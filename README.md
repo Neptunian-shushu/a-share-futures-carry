@@ -255,6 +255,8 @@ python scripts/run_real_backtest.py \
 
 The benchmark CSV must contain a unique date column (default `trade_date`) and strictly
 positive prices (default `close`).
+If it also contains a non-negative per-share cash distribution column, pass
+`--benchmark-distribution-column` to calculate reinvested-distribution returns.
 
 Generate a free 510500 benchmark snapshot with:
 

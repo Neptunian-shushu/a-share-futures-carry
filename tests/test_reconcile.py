@@ -30,3 +30,19 @@ def test_price_benchmark_backtest_preserves_price_series_dates_and_nav():
     backtest = price_benchmark_backtest(prices, initial_nav=1_000.0)
     assert backtest["trade_date"].tolist() == [pd.Timestamp("2026-01-02"), pd.Timestamp("2026-01-05")]
     assert backtest["nav"].iloc[-1] == 1_010.0
+
+
+def test_price_benchmark_can_include_cash_distributions():
+    prices = pd.DataFrame(
+        {
+            "trade_date": ["2026-01-02", "2026-01-05", "2026-01-06"],
+            "close": [100.0, 99.0, 100.0],
+            "distribution": [0.0, 2.0, 0.0],
+        }
+    )
+    returns = price_benchmark_returns(prices, distribution_column="distribution")
+    assert abs(returns.iloc[1] - 0.01) < 1e-12
+    assert abs(
+        price_benchmark_backtest(prices, 1_000.0, distribution_column="distribution")["nav"].iloc[-1]
+        - 1_020.2020202
+    ) < 1e-6

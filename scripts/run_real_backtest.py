@@ -81,6 +81,11 @@ def main() -> None:
     parser.add_argument("--benchmark-date-column", default="trade_date")
     parser.add_argument("--benchmark-price-column", default="close")
     parser.add_argument(
+        "--benchmark-distribution-column",
+        default=None,
+        help="Optional per-share cash distribution column for a total-return benchmark",
+    )
+    parser.add_argument(
         "--carry-mode",
         choices=("config", "observed", "fair"),
         default="config",
@@ -204,12 +209,14 @@ def main() -> None:
             benchmark_prices,
             date_column=args.benchmark_date_column,
             price_column=args.benchmark_price_column,
+            distribution_column=args.benchmark_distribution_column,
         )
         backtests[args.benchmark_name] = price_benchmark_backtest(
             benchmark_prices,
             cfg["portfolio"]["initial_nav"],
             date_column=args.benchmark_date_column,
             price_column=args.benchmark_price_column,
+            distribution_column=args.benchmark_distribution_column,
         )
         for name in list(backtests):
             if name != args.benchmark_name and not name.endswith("_spot_benchmark"):

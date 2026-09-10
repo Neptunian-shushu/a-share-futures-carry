@@ -29,24 +29,39 @@ def price_benchmark_returns(
     *,
     date_column: str = "trade_date",
     price_column: str = "close",
+    distribution_column: str | None = None,
 ) -> pd.Series:
-    """Convert a dated ETF or index close series into benchmark returns."""
+    """Convert a dated ETF/index series into price or total-return returns.
+
+    When ``distribution_column`` is supplied, its cash distribution per share
+    is added to the current price before dividing by the prior price. This
+    supports a true reinvested-distribution benchmark when the input contains
+    ex-date distributions.
+    """
     if date_column not in prices or price_column not in prices:
         raise ValueError(f"Benchmark requires {date_column} and {price_column}")
-    series = prices[[date_column, price_column]].copy()
+    columns = [date_column, price_column]
+    if distribution_column is not None:
+        if distribution_column not in prices:
+            raise ValueError(f"Benchmark requires {distribution_column}")
+        columns.append(distribution_column)
+    series = prices[columns].copy()
     series[date_column] = pd.to_datetime(series[date_column])
     series[price_column] = pd.to_numeric(series[price_column], errors="coerce")
+    if distribution_column is not None:
+        series[distribution_column] = pd.to_numeric(series[distribution_column], errors="coerce").fillna(0.0)
+        if (series[distribution_column] < 0).any():
+            raise ValueError("Benchmark distributions must be non-negative")
     if series[date_column].duplicated().any():
         raise ValueError("Benchmark contains duplicate dates")
     if (series[price_column] <= 0).any() or series[price_column].isna().any():
         raise ValueError("Benchmark prices must be strictly positive")
-    return (
-        series.sort_values(date_column)
-        .set_index(date_column)[price_column]
-        .pct_change()
-        .fillna(0.0)
-        .rename("benchmark_return")
-    )
+    series = series.sort_values(date_column).set_index(date_column)
+    if distribution_column is None:
+        returns = series[price_column].pct_change()
+    else:
+        returns = (series[price_column] + series[distribution_column]) / series[price_column].shift(1) - 1.0
+    return returns.fillna(0.0).rename("benchmark_return")
 
 
 def returns_benchmark_backtest(returns: pd.Series, initial_nav: float) -> pd.DataFrame:
@@ -76,6 +91,7 @@ def price_benchmark_backtest(
     *,
     date_column: str = "trade_date",
     price_column: str = "close",
+    distribution_column: str | None = None,
 ) -> pd.DataFrame:
     """Build a benchmark-shaped frame from an ETF or index price series."""
     return returns_benchmark_backtest(
@@ -83,6 +99,7 @@ def price_benchmark_backtest(
             prices,
             date_column=date_column,
             price_column=price_column,
+            distribution_column=distribution_column,
         ),
         initial_nav,
     )
