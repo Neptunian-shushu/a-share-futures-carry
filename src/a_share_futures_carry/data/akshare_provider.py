@@ -52,7 +52,7 @@ def _normalize_cffex_daily(df: pd.DataFrame, trade_date: str | None = None) -> p
     if df is None or df.empty:
         return pd.DataFrame()
     symbol_column = _first_column(df, ("symbol", "合约代码", "合约"))
-    close_column = _first_column(df, ("close", "收盘", "收盘价"))
+    close_column = _first_column(df, ("close", "收盘", "收盘价", "今收盘"))
     if symbol_column is None or close_column is None:
         raise ValueError("AkShare CFFEX data lacks contract or close columns")
     out = pd.DataFrame()
@@ -65,7 +65,7 @@ def _normalize_cffex_daily(df: pd.DataFrame, trade_date: str | None = None) -> p
     else:
         out["trade_date"] = pd.to_datetime(df[date_column], errors="coerce")
     out["futures_close"] = pd.to_numeric(df[close_column], errors="coerce")
-    settle_column = _first_column(df, ("settle", "结算", "结算价"))
+    settle_column = _first_column(df, ("settle", "结算", "结算价", "今结算"))
     volume_column = _first_column(df, ("volume", "成交量", "成交量(手)"))
     oi_column = _first_column(df, ("open_interest", "持仓量", "空盘量"))
     if settle_column:

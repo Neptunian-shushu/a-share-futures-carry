@@ -26,6 +26,21 @@ def test_normalize_akshare_cffex_daily_columns():
     assert result.loc[0, "multiplier"] == 200.0
 
 
+def test_normalize_legacy_cffex_daily_columns():
+    raw = pd.DataFrame(
+        {
+            "合约代码": ["IC2208"],
+            "今收盘": [6244.8],
+            "今结算": [6233.2],
+            "成交量": [76054],
+            "持仓量": [96095],
+        }
+    )
+    result = _normalize_cffex_daily(raw, "20220722")
+    assert result.loc[0, "futures_close"] == 6244.8
+    assert result.loc[0, "settle"] == 6233.2
+
+
 def test_normalize_akshare_index_history_columns():
     raw = pd.DataFrame({"日期": ["2026-01-02"], "收盘": [6000]})
     result = _normalize_index_history(raw)
