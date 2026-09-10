@@ -24,9 +24,10 @@ def main() -> None:
     parser.add_argument("--end", required=True, help="YYYYMMDD")
     parser.add_argument("--output", default="data/raw/cffex_panel_public.csv")
     parser.add_argument("--cache-dir", default="data/raw/cffex_monthly_cache")
+    parser.add_argument("--workers", type=int, default=4)
     args = parser.parse_args()
 
-    panel = CffexPublicProvider(cache_dir=args.cache_dir).build_contract_panel(
+    panel = CffexPublicProvider(cache_dir=args.cache_dir, workers=args.workers).build_contract_panel(
         args.families, args.start, args.end
     )
     if panel.empty:

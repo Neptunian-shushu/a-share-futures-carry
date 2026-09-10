@@ -8,6 +8,7 @@ the cash-index leg to the existing AkShare/Sina fallback provider.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO, StringIO
 from pathlib import Path
 import re
@@ -38,8 +39,11 @@ class CffexPublicProvider:
     index_provider: object | None = None
     cache_dir: str | Path | None = None
     timeout: int = 30
+    workers: int = 4
 
     def __post_init__(self) -> None:
+        if self.workers < 1:
+            raise ValueError("workers must be at least 1")
         if self.index_provider is None:
             try:
                 from .akshare_provider import AkshareProvider
@@ -95,20 +99,29 @@ class CffexPublicProvider:
     ) -> pd.DataFrame:
         families = tuple(str(f).upper() for f in families)
         periods = pd.period_range(start_date, end_date, freq="M")
-        frames: list[pd.DataFrame] = []
+        frames: dict[pd.Period, pd.DataFrame] = {}
         errors: list[str] = []
-        for period in periods:
-            try:
-                month = self._parse_month(self._month_payload(period), families)
-            except Exception as exc:
-                errors.append(f"{period}: {type(exc).__name__}: {exc}")
-                continue
-            if not month.empty:
-                frames.append(month)
+
+        def load(period: pd.Period) -> tuple[pd.Period, pd.DataFrame]:
+            return period, self._parse_month(self._month_payload(period), families)
+
+        with ThreadPoolExecutor(max_workers=self.workers) as executor:
+            future_to_period = {
+                executor.submit(load, period): period for period in periods
+            }
+            for future in as_completed(future_to_period):
+                period = future_to_period[future]
+                try:
+                    period, month = future.result()
+                except Exception as exc:
+                    errors.append(f"{period}: {type(exc).__name__}: {exc}")
+                    continue
+                if not month.empty:
+                    frames[period] = month
         if not frames:
             detail = "; ".join(errors[:3])
             raise RuntimeError(f"No CFFEX public data returned. {detail}")
-        panel = pd.concat(frames, ignore_index=True)
+        panel = pd.concat([frames[period] for period in sorted(frames)], ignore_index=True)
         start = pd.Timestamp(start_date)
         end = pd.Timestamp(end_date)
         return panel[panel["trade_date"].between(start, end)].reset_index(drop=True)
