@@ -10,11 +10,11 @@ Bootstrap: 300 resamples, contiguous 20-session blocks, seed 42.
 
 | Carry mode | Strategy | CAGR | Sharpe | Max drawdown | Bootstrap Sharpe p05 | P(Sharpe > 0) |
 |---|---|---:|---:|---:|---:|---:|
-| observed | IC front | 17.13% | 0.787 | -16.77% | -0.766 | 77.7% |
-| observed | IC max carry | 18.84% | 0.822 | -17.56% | -0.754 | 78.3% |
-| observed | IM front | 14.71% | 0.705 | -18.62% | -0.740 | 76.3% |
+| observed | IC front | 21.46% | 0.926 | -16.73% | -0.685 | 80.7% |
+| observed | IC max carry | 18.86% | 0.815 | -17.82% | -0.763 | 78.3% |
+| observed | IM front | 14.90% | 0.714 | -19.82% | -0.825 | 75.3% |
 | observed | dynamic max carry | 12.24% | 0.605 | -18.11% | -0.904 | 74.7% |
-| observed | carry allocation | 4.31% | 0.517 | -6.95% | -1.209 | 63.7% |
+| observed | carry allocation | 4.31% | 0.517 | -6.89% | -1.209 | 63.7% |
 | observed | carry + volatility target | 1.92% | 0.814 | -2.62% | -1.198 | 70.0% |
 
 The fair-value mode produced the same contract path on this snapshot because the
