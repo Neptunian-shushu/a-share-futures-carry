@@ -1,0 +1,10 @@
+{
+  "provider": "cffex_official_monthly_zip+akshare_index_fallback",
+  "families": ["IC", "IM"],
+  "start_date": "20220722",
+  "end_date": "20260909",
+  "observed_start_date": "2022-07-22",
+  "observed_end_date": "2026-09-09",
+  "rows": 8032,
+  "sha256": "ba03ce729981698f536029e2beeb3b71843c3d97cd2c5a73cdfa2ac98377ab24"
+}
