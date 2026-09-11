@@ -141,6 +141,15 @@ def summarize_backtest(
     for column, name in (("roll_event", "roll_count"), ("margin_call", "margin_call_count")):
         if column in backtest:
             summary[name] = float(backtest[column].fillna(False).astype(bool).sum())
+    for column, name in (
+        ("liquidity_constrained", "liquidity_constraint_count"),
+        ("liquidity_data_missing", "liquidity_data_missing_count"),
+        ("spread_data_missing", "spread_data_missing_count"),
+    ):
+        if column in backtest:
+            summary[name] = float(backtest[column].fillna(False).astype(bool).sum())
+    if "effective_cost_bps" in backtest:
+        summary["average_effective_cost_bps"] = float(backtest["effective_cost_bps"].mean())
     if "exposure_to_nav" in backtest:
         summary["average_exposure"] = float(backtest["exposure_to_nav"].mean())
         summary["max_exposure"] = float(backtest["exposure_to_nav"].max())

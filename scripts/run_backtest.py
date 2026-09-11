@@ -138,6 +138,9 @@ def main() -> None:
         integer_contracts=p["integer_contracts"],
         execution_price_col=p["execution_price_col"],
         mark_price_col=p["mark_price_col"],
+        max_participation_rate=p.get("max_participation_rate"),
+        spread_bps_column=p.get("spread_bps_column"),
+        default_spread_bps=p.get("default_spread_bps", 0.0),
     )
     summary = summarize_backtest(bt)
     print(pd.Series(summary).to_string())

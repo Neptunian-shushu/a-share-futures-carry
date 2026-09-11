@@ -69,6 +69,9 @@ def backtest_selected_contracts(
     integer_contracts: bool = True,
     execution_price_col: str = "settle",
     mark_price_col: str = "settle",
+    max_participation_rate: float | None = None,
+    spread_bps_column: str | None = None,
+    default_spread_bps: float = 0.0,
 ) -> pd.DataFrame:
     """Backtest one selected contract per signal date.
 
@@ -80,9 +83,14 @@ def backtest_selected_contracts(
     on roll days.
 
     The returned frame contains total NAV, daily futures PnL, collateral PnL,
-    turnover, margin usage, exposure and roll diagnostics.  Fractional sizing
-    remains available for theoretical studies, but integer sizing is the safe
-    default for live-like research.
+    turnover, margin usage, exposure, roll and execution-liquidity diagnostics.
+    Fractional sizing remains available for theoretical studies, but integer
+    sizing is the safe default for live-like research.
+
+    ``max_participation_rate`` caps the daily order in contracts using the
+    target row's ``vol`` field. ``spread_bps_column`` can supply a row-level
+    round-trip spread estimate; otherwise ``default_spread_bps`` is used and
+    the returned diagnostics flag the missing spread observation.
     """
     if initial_nav <= 0:
         raise ValueError("initial_nav must be positive")
@@ -96,6 +104,10 @@ def backtest_selected_contracts(
         raise ValueError("collateral_yield_annual must be greater than -100%")
     if transaction_cost_bps < 0:
         raise ValueError("transaction_cost_bps must be non-negative")
+    if max_participation_rate is not None and not 0 < max_participation_rate <= 1:
+        raise ValueError("max_participation_rate must be in (0, 1]")
+    if default_spread_bps < 0:
+        raise ValueError("default_spread_bps must be non-negative")
     if selected.empty:
         return pd.DataFrame()
     if "trade_date" not in selected or "contract" not in selected:
@@ -205,7 +217,11 @@ def backtest_selected_contracts(
             if pd.notna(value):
                 target_weight = max(float(value), 0.0)
 
+        same_contract_target = previous_contract is not None and target_contract == previous_contract
         margin_constrained = False
+        liquidity_constrained = False
+        liquidity_data_missing = False
+        spread_data_missing = False
         if target_price is not None and target_multiplier > 0 and target_contract is not None:
             new_contracts, margin_constrained = _size_contracts(
                 nav_before_trade,
@@ -217,6 +233,24 @@ def backtest_selected_contracts(
                 target_margin_rate,
                 margin_buffer,
             )
+            if max_participation_rate is not None:
+                volume = None
+                if target_row is not None and "vol" in target_row.index and pd.notna(target_row["vol"]):
+                    volume = max(float(target_row["vol"]), 0.0)
+                if volume is None:
+                    liquidity_data_missing = True
+                else:
+                    order_capacity = volume * max_participation_rate
+                    if same_contract_target:
+                        delta = new_contracts - previous_contracts
+                        clipped_delta = max(-order_capacity, min(order_capacity, delta))
+                        clipped_contracts = previous_contracts + clipped_delta
+                    else:
+                        clipped_contracts = min(new_contracts, order_capacity)
+                    if integer_contracts:
+                        clipped_contracts = float(floor(clipped_contracts))
+                    liquidity_constrained = abs(clipped_contracts - new_contracts) > 1e-12
+                    new_contracts = max(clipped_contracts, 0.0)
             target_position_contract = target_contract if new_contracts > 0 else None
         else:
             new_contracts = 0.0
@@ -230,7 +264,18 @@ def backtest_selected_contracts(
             open_turnover = abs(new_contracts * (target_price or 0.0) * target_multiplier)
             turnover_notional = close_turnover + open_turnover
 
-        trading_cost = turnover_notional * transaction_cost_bps / 10_000.0
+        spread_bps = default_spread_bps
+        spread_row = target_row if target_row is not None else held_row
+        if spread_bps_column:
+            if spread_row is not None and spread_bps_column in spread_row.index:
+                if pd.notna(spread_row[spread_bps_column]):
+                    spread_bps = max(float(spread_row[spread_bps_column]), 0.0)
+                else:
+                    spread_data_missing = True
+            else:
+                spread_data_missing = True
+        effective_cost_bps = transaction_cost_bps + spread_bps
+        trading_cost = turnover_notional * effective_cost_bps / 10_000.0
         nav = nav_before_trade - trading_cost
         margin_used = abs(new_contracts * (target_price or 0.0) * target_multiplier) * target_margin_rate * margin_buffer
         free_cash = nav - margin_used
@@ -260,6 +305,11 @@ def backtest_selected_contracts(
             "free_cash": free_cash,
             "margin_call": margin_call,
             "margin_constrained": margin_constrained,
+            "liquidity_constrained": liquidity_constrained,
+            "liquidity_data_missing": liquidity_data_missing,
+            "spread_data_missing": spread_data_missing,
+            "spread_bps": spread_bps,
+            "effective_cost_bps": effective_cost_bps,
             "roll_event": roll_event,
             "missing_mark": missing_mark,
             "nav": nav,

@@ -44,3 +44,13 @@ def test_schema_rejects_non_numeric_optional_field():
     row["margin_rate"] = "not-a-rate"
     with pytest.raises(ValueError, match="margin_rate"):
         prepare_contract_data(pd.DataFrame([row]))
+
+
+@pytest.mark.parametrize("column", ["vol", "oi", "spread_bps"])
+def test_schema_rejects_negative_execution_or_liquidity_field(column):
+    row = _valid_row()
+    row[column] = -1
+    report = data_quality_report(pd.DataFrame([row]))
+    assert not report["ok"]
+    with pytest.raises(ValueError, match=column):
+        prepare_contract_data(pd.DataFrame([row]))

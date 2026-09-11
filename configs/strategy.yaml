@@ -29,6 +29,9 @@ portfolio:
   signal_lag_sessions: 1
   execution_price_col: settle
   mark_price_col: settle
+  max_participation_rate: 0.10
+  spread_bps_column: spread_bps
+  default_spread_bps: 0.0
 
 allocation:
   enabled: true

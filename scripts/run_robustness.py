@@ -123,6 +123,9 @@ def _run(selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -> pd.DataFrame:
         signal_lag_sessions=p["signal_lag_sessions"], margin_rate=p["margin_rate"],
         margin_buffer=p["margin_buffer"], integer_contracts=p["integer_contracts"],
         execution_price_col=p["execution_price_col"], mark_price_col=p["mark_price_col"],
+        max_participation_rate=p.get("max_participation_rate"),
+        spread_bps_column=p.get("spread_bps_column"),
+        default_spread_bps=p.get("default_spread_bps", 0.0),
     )
 
 
@@ -213,20 +216,29 @@ def main() -> None:
             continue
         for cost_multiplier in (0.5, 1.0, 2.0):
             for margin_rate in (0.08, 0.12, 0.20):
-                variant = deepcopy(cfg)
-                variant["portfolio"]["commission_bps"] *= cost_multiplier
-                variant["portfolio"]["slippage_bps"] *= cost_multiplier
-                variant["portfolio"]["margin_rate"] = margin_rate
-                backtest = _fixed_test(_run(selected, base_data, variant), test_start)
-                metrics = summarize_backtest(backtest) if not backtest.empty else {}
-                stress_rows.append({
-                    "strategy": strategy_name, "cost_multiplier": cost_multiplier,
-                    "margin_rate": margin_rate, "test_start": test_start,
-                    "cagr": metrics.get("cagr", np.nan), "sharpe": metrics.get("sharpe", np.nan),
-                    "max_drawdown": metrics.get("max_drawdown", np.nan),
-                    "total_trading_cost": metrics.get("total_trading_cost", np.nan),
-                    "margin_call_count": metrics.get("margin_call_count", np.nan),
-                })
+                for spread_bps in (0.0, 1.0, 2.0):
+                    for participation_rate in (0.001, 0.01, 0.10):
+                        variant = deepcopy(cfg)
+                        variant["portfolio"]["commission_bps"] *= cost_multiplier
+                        variant["portfolio"]["slippage_bps"] *= cost_multiplier
+                        variant["portfolio"]["margin_rate"] = margin_rate
+                        variant["portfolio"]["default_spread_bps"] = spread_bps
+                        variant["portfolio"]["max_participation_rate"] = participation_rate
+                        backtest = _fixed_test(_run(selected, base_data, variant), test_start)
+                        metrics = summarize_backtest(backtest) if not backtest.empty else {}
+                        stress_rows.append({
+                            "strategy": strategy_name, "cost_multiplier": cost_multiplier,
+                            "margin_rate": margin_rate, "test_start": test_start,
+                            "spread_bps": spread_bps, "participation_rate": participation_rate,
+                            "cagr": metrics.get("cagr", np.nan), "sharpe": metrics.get("sharpe", np.nan),
+                            "max_drawdown": metrics.get("max_drawdown", np.nan),
+                            "total_trading_cost": metrics.get("total_trading_cost", np.nan),
+                            "margin_call_count": metrics.get("margin_call_count", np.nan),
+                            "liquidity_constraint_count": metrics.get("liquidity_constraint_count", np.nan),
+                            "liquidity_data_missing_count": metrics.get("liquidity_data_missing_count", np.nan),
+                            "spread_data_missing_count": metrics.get("spread_data_missing_count", np.nan),
+                            "average_effective_cost_bps": metrics.get("average_effective_cost_bps", np.nan),
+                        })
 
     summary = pd.DataFrame(summary_rows)
     regimes = pd.DataFrame(regime_rows)

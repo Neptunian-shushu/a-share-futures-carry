@@ -63,6 +63,9 @@ def _run_one(name: str, selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -
         integer_contracts=portfolio["integer_contracts"],
         execution_price_col=portfolio["execution_price_col"],
         mark_price_col=portfolio["mark_price_col"],
+        max_participation_rate=portfolio.get("max_participation_rate"),
+        spread_bps_column=portfolio.get("spread_bps_column"),
+        default_spread_bps=portfolio.get("default_spread_bps", 0.0),
     )
 
 

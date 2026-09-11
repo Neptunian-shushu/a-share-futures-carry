@@ -28,8 +28,12 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 - 波动率目标显著降低了回撤，并提高了点估计 Sharpe，但代价是 CAGR 和平均敞口大幅下降。
 - 市场状态拆分显示，留出集收益主要来自上涨市场；下跌市场表现仍为负。这再次确认策略是
   “长期权益 beta + 基差收益”，而不是市场中性套利。
-- 在 0.5/1/2 倍成本和 8%/12%/20% 保证金率压力测试中没有出现追加保证金；最大 carry
-  策略换手更多，对成本假设更敏感。
+- 新增的执行层压力矩阵覆盖 0.5/1/2 倍佣金与滑点、0/1/2bp 价差、8%/12%/20% 保证金率和
+  0.1%/1%/10% 成交量参与率，共 486 个情景。所有情景均没有追加保证金；0.1% 参与率下只有
+  IH 近月 5 个交易日、动态最大 carry 2 个交易日出现成交量约束，其余策略没有被约束。
+- 在这组压力情景中，IC 近月的最差 CAGR 仍为 19.70%，IM 近月为 12.27%，而动态最大 carry
+  的最差 CAGR 为 4.70%，并且交易成本可达到约 103.7 万；这强化了近月基线相对于复杂最大 carry
+  的可执行性优势。由于快照没有逐日 bid/ask，价差仍是代理假设，不是盘口回放结果。
 
 ## 严格三段式滚动样本外验证
 
@@ -45,3 +49,4 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 - `outputs/real_robustness/fixed_holdout_summary.csv`
 - `outputs/real_robustness/regime_summary.csv`
 - `outputs/real_robustness/implementation_stress.csv`
+- `outputs/full_robustness_liquidity/implementation_stress.csv`（四品种完整快照的最新执行压力矩阵）

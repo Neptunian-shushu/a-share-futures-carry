@@ -160,6 +160,7 @@ Required columns:
 
 Useful optional columns include `settle`, `vol`, and `oi`.
 Optional research columns include `funding_rate`, `dividend_yield`, and `margin_rate`.
+An optional `spread_bps` column can provide a dated round-trip execution-spread estimate.
 
 Validate a panel before using it:
 
@@ -218,7 +219,7 @@ input is required for accurate roll-day marking.
 
 ## Risk controls
 
-The default research design caps futures notional exposure at 1.0x NAV. Margin availability is **not** treated as permission to lever the equity beta. The engine applies a configurable margin rate and buffer, integer sizing, liquidity fields and explicit turnover costs. Production implementation should additionally calibrate exchange-specific margin schedules, limit moves and executable bid/ask spreads.
+The default research design caps futures notional exposure at 1.0x NAV. Margin availability is **not** treated as permission to lever the equity beta. The engine applies a configurable margin rate and buffer, integer sizing, volume participation caps, optional row-level spread costs and explicit turnover costs. The robustness runner stresses 0.5x/1x/2x commissions and slippage, 0/1/2bp spreads, and 8%/12%/20% margin rates. Production implementation should still calibrate exchange-specific margin schedules, limit moves and live executable prices.
 
 ## Research reports
 
@@ -301,7 +302,7 @@ python scripts/run_robustness.py \
 
 This keeps the final 252 sessions untouched by parameter selection, compares
 observed versus fair-value carry, reports up/down-market regimes, runs a seeded
-block bootstrap, and stresses transaction costs and margin rates. It is intended
+block bootstrap, and stresses transaction costs, execution spreads and margin rates. It is intended
 to expose fragility rather than to manufacture a single best configuration.
 
 ## Fair-value carry
@@ -315,10 +316,10 @@ research conclusions should report both versions.
 ## Current limitations
 
 The engine now models daily settlement-style marking, integer sizing, margin budgets,
-expiry roll windows, configurable costs and fair-value signals. Remaining production
-work is calibration: verify the exact CFFEX holiday-adjusted last trading dates,
-exchange-specific margin schedules, dividend forecasts, bid/ask execution and ETF
-total-return data against an independent source.
+expiry roll windows, configurable costs, volume participation and row-level spread
+inputs. Remaining production work is calibration: verify the exact CFFEX holiday-adjusted
+last trading dates, exchange-specific margin schedules, dividend forecasts, bid/ask
+execution and ETF total-return data against an independent source.
 
 ## Roadmap
 
@@ -338,6 +339,7 @@ total-return data against an independent source.
 - [x] Add dynamic carry percentile/z-score allocation
 - [x] Add cost-adjusted selection, rollover hysteresis and volatility targeting
 - [x] Add fixed-holdout, regime, bootstrap and margin/cost stress diagnostics
+- [x] Add volume-participation, row-level spread and execution stress diagnostics
 - [x] Extend the reproducible snapshot and diagnostics to IF/IH as well as IC/IM
 - [x] Produce research report and charts
 - [x] Add regression tests and GitHub Actions CI

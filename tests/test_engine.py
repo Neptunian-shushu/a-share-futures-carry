@@ -98,3 +98,47 @@ def test_signal_is_executed_on_next_session():
     assert result.loc[1, "contract"] == "IC2602"
     assert result.loc[2, "contract"] == "IC2603"
     assert result.loc[1, "signal_date"] == pd.Timestamp("2026-01-02")
+
+
+def test_liquidity_cap_and_dynamic_spread_are_explicit():
+    market = _panel({"IC2602": [100.0, 101.0, 102.0]})
+    market["vol"] = 100.0
+    market["spread_bps"] = 3.0
+    selected = market.copy()
+    result = backtest_selected_contracts(
+        selected,
+        initial_nav=100_000.0,
+        max_notional_to_nav=0.1,
+        collateral_yield_annual=0.0,
+        transaction_cost_bps=1.0,
+        market_data=market,
+        signal_lag_sessions=0,
+        margin_rate=0.0,
+        max_participation_rate=0.01,
+        spread_bps_column="spread_bps",
+        integer_contracts=True,
+    )
+    assert result.loc[0, "contracts"] == 1.0
+    assert bool(result.loc[0, "liquidity_constrained"])
+    assert not bool(result.loc[0, "spread_data_missing"])
+    assert result.loc[0, "effective_cost_bps"] == 4.0
+    assert result.loc[0, "trading_cost"] == 0.04
+
+
+def test_missing_spread_column_is_flagged_when_default_is_used():
+    market = _panel({"IC2602": [100.0, 101.0, 102.0]})
+    selected = market.copy()
+    result = backtest_selected_contracts(
+        selected,
+        initial_nav=100_000.0,
+        max_notional_to_nav=0.1,
+        collateral_yield_annual=0.0,
+        transaction_cost_bps=1.0,
+        market_data=market,
+        signal_lag_sessions=0,
+        margin_rate=0.0,
+        spread_bps_column="spread_bps",
+        default_spread_bps=2.0,
+    )
+    assert result["spread_data_missing"].all()
+    assert (result["effective_cost_bps"] == 3.0).all()

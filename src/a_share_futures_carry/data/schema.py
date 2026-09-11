@@ -24,6 +24,7 @@ NUMERIC_COLUMNS = (
     "funding_rate",
     "dividend_yield",
     "margin_rate",
+    "spread_bps",
 )
 
 
@@ -99,6 +100,19 @@ def data_quality_report(df: pd.DataFrame) -> dict[str, object]:
         report["negative_margin_rate"] = invalid
         if invalid:
             issues.append(f"negative margin_rate values: {invalid}")
+    if "spread_bps" in df:
+        values = pd.to_numeric(df["spread_bps"], errors="coerce")
+        invalid = int((values < 0).sum())
+        report["negative_spread_bps"] = invalid
+        if invalid:
+            issues.append(f"negative spread_bps values: {invalid}")
+    for column in ("vol", "oi"):
+        if column in df:
+            values = pd.to_numeric(df[column], errors="coerce")
+            invalid = int((values < 0).sum())
+            report[f"negative_{column}"] = invalid
+            if invalid:
+                issues.append(f"negative {column} values: {invalid}")
 
     report["date_start"] = trade_dates.min()
     report["date_end"] = trade_dates.max()
@@ -150,6 +164,11 @@ def prepare_contract_data(df: pd.DataFrame, *, drop_expired: bool = False) -> pd
             raise ValueError(f"{column} must be strictly positive")
     if "margin_rate" in out and ((out["margin_rate"].notna()) & (out["margin_rate"] < 0)).any():
         raise ValueError("margin_rate must be non-negative when provided")
+    if "spread_bps" in out and ((out["spread_bps"].notna()) & (out["spread_bps"] < 0)).any():
+        raise ValueError("spread_bps must be non-negative when provided")
+    for column in ("vol", "oi"):
+        if column in out and ((out[column].notna()) & (out[column] < 0)).any():
+            raise ValueError(f"{column} must be non-negative when provided")
     if out[["trade_date", "contract"]].duplicated().any():
         raise ValueError("Duplicate (trade_date, contract) rows found")
 
