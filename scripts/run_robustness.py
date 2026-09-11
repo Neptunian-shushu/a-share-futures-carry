@@ -222,6 +222,9 @@ def main() -> None:
                         variant["portfolio"]["commission_bps"] *= cost_multiplier
                         variant["portfolio"]["slippage_bps"] *= cost_multiplier
                         variant["portfolio"]["margin_rate"] = margin_rate
+                        # Stress the configured scalar spread independently of
+                        # any row-level spread observations in the source panel.
+                        variant["portfolio"]["spread_bps_column"] = None
                         variant["portfolio"]["default_spread_bps"] = spread_bps
                         variant["portfolio"]["max_participation_rate"] = participation_rate
                         backtest = _fixed_test(_run(selected, base_data, variant), test_start)
