@@ -10,6 +10,21 @@ import pandas as pd
 from a_share_futures_carry.metrics.performance import summarize_backtest
 
 
+def _display_strategy_name(name: str) -> str:
+    """Use readable Chinese labels in charts while keeping CSV keys stable."""
+    labels = {
+        "IF": "IF", "IH": "IH", "IC": "IC", "IM": "IM",
+        "spot_benchmark": "现货基准", "front": "近月", "second": "次近月",
+        "max_carry": "最大Carry", "dynamic_IC_IM": "IC/IM动态",
+        "carry_allocation": "Carry仓位", "carry_vol_target": "Carry+波动率目标",
+        "CSI500_ETF_raw_close": "中证500 ETF（未含分红）",
+    }
+    result = name
+    for source, target in labels.items():
+        result = result.replace(source, target)
+    return result
+
+
 def spot_benchmark_returns(panel: pd.DataFrame, family: str) -> pd.Series:
     """Return close-to-close spot-index returns for one futures family."""
     family_data = panel[panel["family"].astype(str).str.upper() == family.upper()]
@@ -163,6 +178,8 @@ def generate_research_report(
         mpl_config.mkdir(parents=True, exist_ok=True)
         os.environ.setdefault("MPLCONFIGDIR", str(mpl_config))
         import matplotlib.pyplot as plt
+        plt.rcParams["font.sans-serif"] = ["PingFang SC", "Hiragino Sans GB", "Arial Unicode MS", "DejaVu Sans"]
+        plt.rcParams["axes.unicode_minus"] = False
     except ImportError:
         return summary_df
 
@@ -175,8 +192,9 @@ def generate_research_report(
     ):
         fig, ax = plt.subplots(figsize=(11, 6))
         for name, group in combined.groupby("strategy"):
-            ax.plot(group["trade_date"], group[column], label=name)
-        ax.set_ylabel(ylabel)
+            ax.plot(group["trade_date"], group[column], label=_display_strategy_name(name))
+        ax.set_title("策略累计净值" if column == "wealth" else "策略回撤")
+        ax.set_ylabel("累计净值" if column == "wealth" else "回撤")
         ax.grid(alpha=0.25)
         ax.legend(loc="best")
         fig.autofmt_xdate()
@@ -186,8 +204,10 @@ def generate_research_report(
 
     fig, ax = plt.subplots(figsize=(10, 5))
     summary_plot = summary_df.set_index("strategy")
+    summary_plot.index = [_display_strategy_name(str(name)) for name in summary_plot.index]
     summary_plot["cagr"].sort_values().plot.barh(ax=ax)
-    ax.set_xlabel("CAGR")
+    ax.set_title("策略年化复合收益率对比")
+    ax.set_xlabel("年化复合收益率（CAGR）")
     ax.grid(axis="x", alpha=0.25)
     fig.tight_layout()
     fig.savefig(output / "cagr_comparison.png", dpi=150)
@@ -201,8 +221,17 @@ def generate_research_report(
     ]
     if all(column in summary_df for column in pnl_columns):
         fig, ax = plt.subplots(figsize=(10, 5))
-        summary_plot[pnl_columns].plot.bar(ax=ax)
-        ax.set_ylabel("P&L")
+        pnl_plot = summary_plot[pnl_columns].rename(
+            columns={
+                "total_spot_beta_pnl": "现货Beta盈亏",
+                "total_basis_pnl": "基差/Carry盈亏",
+                "total_collateral_pnl": "抵押品收益",
+                "total_trading_cost": "交易成本",
+            }
+        )
+        pnl_plot.plot.bar(ax=ax)
+        ax.set_title("策略盈亏分解")
+        ax.set_ylabel("盈亏金额")
         ax.grid(axis="y", alpha=0.25)
         fig.autofmt_xdate(rotation=30)
         fig.tight_layout()

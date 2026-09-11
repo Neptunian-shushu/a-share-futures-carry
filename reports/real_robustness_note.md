@@ -1,56 +1,47 @@
-# Fixed-holdout and robustness results
+# 固定留出集与稳健性分析
 
-Snapshot: `data/raw/cffex_panel_cffex_public_ic_im.csv`  
-History: 2022-07-22 to 2026-09-09  
-Final holdout: 252 sessions, 2025-08-27 to 2026-09-09  
-Costs: 1 bp per turnover event in the backtest; selection score additionally charges a 2 bp round-trip switch cost annualized over DTE.  
-Bootstrap: 300 resamples, contiguous 20-session blocks, seed 42.
+数据快照：`data/raw/cffex_panel_cffex_public_ic_im.csv`  
+历史期间：2022-07-22 至 2026-09-09  
+最终留出集：252 个交易日，2025-08-27 至 2026-09-09  
+回测交易成本：每次成交名义金额 1bp；选合约时额外按剩余到期日折算 2bp 换仓成本。  
+Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种子 42。
 
-## Holdout summary
+## 留出集结果
 
-| Carry mode | Strategy | CAGR | Sharpe | Max drawdown | Bootstrap Sharpe p05 | P(Sharpe > 0) |
+| Carry 模式 | 策略 | CAGR | Sharpe | 最大回撤 | Bootstrap Sharpe 5%分位 | P(Sharpe > 0) |
 |---|---|---:|---:|---:|---:|---:|
-| observed | IC front | 21.46% | 0.926 | -16.73% | -0.685 | 80.7% |
-| observed | IC max carry | 18.86% | 0.815 | -17.82% | -0.763 | 78.3% |
-| observed | IM front | 14.90% | 0.714 | -19.82% | -0.825 | 75.3% |
-| observed | dynamic max carry | 12.24% | 0.605 | -18.11% | -0.904 | 74.7% |
-| observed | carry allocation | 4.31% | 0.517 | -6.89% | -1.209 | 63.7% |
-| observed | carry + volatility target | 1.92% | 0.814 | -2.62% | -1.198 | 70.0% |
+| 观察 carry | IC 近月 | 21.46% | 0.926 | -16.73% | -0.685 | 80.7% |
+| 观察 carry | IC 最大 carry | 18.86% | 0.815 | -17.82% | -0.763 | 78.3% |
+| 观察 carry | IM 近月 | 14.90% | 0.714 | -19.82% | -0.825 | 75.3% |
+| 观察 carry | IC/IM 动态最大 carry | 12.24% | 0.605 | -18.11% | -0.904 | 74.7% |
+| 观察 carry | 动态 carry 仓位 | 4.31% | 0.517 | -6.89% | -1.209 | 63.7% |
+| 观察 carry | carry + 波动率目标 | 1.92% | 0.814 | -2.62% | -1.198 | 70.0% |
 
-The fair-value mode produced the same contract path on this snapshot because the
-constant funding/dividend assumptions changed signal levels but not their ranking.
-That is a useful diagnostic: the fair-value model is now available, but it should
-not be interpreted as a validated dividend forecast until row-level forward inputs
-are supplied.
+公允价值模式在本快照中产生了相同的合约路径，因为恒定融资利率/股息率假设改变了
+信号水平，但没有改变信号排序。这说明公允价值模型已经可用；但在提供逐行的远期股息
+和融资输入前，不能把它解释为经过验证的股息预测模型。
 
-## Interpretation
+## 结果解读
 
-- The fixed holdout is positive for every always-invested futures variant, but the
-  block-bootstrap lower Sharpe quantile is negative for all of them. The result is
-  therefore promising but statistically fragile.
-- Volatility targeting materially reduced drawdown and raised the point-estimate
-  Sharpe, at the cost of much lower CAGR and average exposure.
-- The regime split shows that most of the holdout gains came from the up-market
-  regime; down-market performance remained negative. This confirms the strategy is
-  long equity beta plus basis exposure, not market-neutral arbitrage.
-- Stress tests across 0.5x/1x/2x costs and 8%/12%/20% margin rates produced no
-  margin calls in the tested snapshot. Cost assumptions still matter most for
-  max-carry variants because they switch much more often.
+- 固定留出集中的常驻期货策略均为正收益，但 block bootstrap 的 Sharpe 下分位数均为负，
+  因此结果有潜力但统计上仍然脆弱。
+- 波动率目标显著降低了回撤，并提高了点估计 Sharpe，但代价是 CAGR 和平均敞口大幅下降。
+- 市场状态拆分显示，留出集收益主要来自上涨市场；下跌市场表现仍为负。这再次确认策略是
+  “长期权益 beta + 基差收益”，而不是市场中性套利。
+- 在 0.5/1/2 倍成本和 8%/12%/20% 保证金率压力测试中没有出现追加保证金；最大 carry
+  策略换手更多，对成本假设更敏感。
 
-Machine-readable outputs are written to `outputs/real_robustness/`:
+## 严格三段式滚动样本外验证
 
-- `fixed_holdout_summary.csv`
-- `regime_summary.csv`
-- `implementation_stress.csv`
+使用 252 个交易日训练、63 个交易日验证、63 个交易日测试、63 日滚动步长，以及
+`0.3/0.5/0.7` 三个阈值，共得到 10 个样本外窗口：6 个窗口收益为正，平均测试收益
+1.91%，测试收益中位数 2.37%，平均测试 Sharpe 0.658，最差测试收益 -5.17%。每个窗口
+先回测完整历史再截取测试区间，因此没有在测试边界重置持仓，并保留了 1 个交易日的执行滞后。
 
-## Strict three-way walk-forward
+机器可读结果：`outputs/real_walk_forward_strict_summary.csv`。
 
-The stricter walk-forward run used 252 training sessions, 63 validation sessions,
-63 test sessions, a 63-session step, and thresholds `0.3/0.5/0.7`. It produced 10
-out-of-sample windows: 6 had positive returns, mean test return was 1.91%, median
-test return was 2.37%, mean test Sharpe was 0.658, and the worst test return was
--5.17%. Each window ran the full history before slicing the evaluation period, so
-the portfolio did not reset to zero at the test boundary and the one-session
-execution lag remained active.
+## 机器可读输出
 
-The machine-readable result is `outputs/real_walk_forward_strict_summary.csv`.
+- `outputs/real_robustness/fixed_holdout_summary.csv`
+- `outputs/real_robustness/regime_summary.csv`
+- `outputs/real_robustness/implementation_stress.csv`
