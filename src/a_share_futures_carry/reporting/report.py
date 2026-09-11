@@ -15,7 +15,8 @@ def _display_strategy_name(name: str) -> str:
     labels = {
         "IF": "IF", "IH": "IH", "IC": "IC", "IM": "IM",
         "spot_benchmark": "现货基准", "front": "近月", "second": "次近月",
-        "max_carry": "最大Carry", "dynamic_IC_IM": "IC/IM动态",
+        "max_carry": "最大Carry", "dynamic_IC_IM_front_switch": "IC/IM近月动态切换",
+        "dynamic_IC_IM": "IC/IM动态",
         "carry_allocation": "Carry仓位", "carry_vol_target": "Carry+波动率目标",
         "CSI500_ETF_raw_close": "中证500 ETF（未含分红）",
     }

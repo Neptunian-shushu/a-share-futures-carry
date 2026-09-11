@@ -14,6 +14,7 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 | 观察 carry | IC 最大 carry | 18.86% | 0.815 | -17.82% | -0.763 | 78.3% |
 | 观察 carry | IM 近月 | 14.90% | 0.714 | -19.82% | -0.825 | 75.3% |
 | 观察 carry | IC/IM 动态最大 carry | 12.24% | 0.605 | -18.11% | -0.904 | 74.7% |
+| 观察 carry | IC/IM 近月动态切换 | 27.30% | 1.194 | -14.41% | -0.039 | 94.7% |
 | 观察 carry | 动态 carry 仓位 | 4.31% | 0.517 | -6.89% | -1.209 | 63.7% |
 | 观察 carry | carry + 波动率目标 | 1.92% | 0.814 | -2.62% | -1.198 | 70.0% |
 
@@ -29,11 +30,14 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 - 市场状态拆分显示，留出集收益主要来自上涨市场；下跌市场表现仍为负。这再次确认策略是
   “长期权益 beta + 基差收益”，而不是市场中性套利。
 - 新增的执行层压力矩阵覆盖 0.5/1/2 倍佣金与滑点、0/1/2bp 价差、8%/12%/20% 保证金率和
-  0.1%/1%/10% 成交量参与率，共 486 个情景。所有情景均没有追加保证金；0.1% 参与率下只有
+  0.1%/1%/10% 成交量参与率，共 567 个情景。所有情景均没有追加保证金；0.1% 参与率下只有
   IH 近月 5 个交易日、动态最大 carry 2 个交易日出现成交量约束，其余策略没有被约束。
 - 在这组压力情景中，IC 近月的最差 CAGR 仍为 19.70%，IM 近月为 12.27%，而动态最大 carry
   的最差 CAGR 为 4.70%，并且交易成本可达到约 103.7 万；这强化了近月基线相对于复杂最大 carry
   的可执行性优势。由于快照没有逐日 bid/ask，价差仍是代理假设，不是盘口回放结果。
+- IC/IM 近月动态切换只比较近月合约，并使用 0.2% 年化换仓门槛；留出集 CAGR 27.30%、Sharpe
+  1.194、最大回撤 -14.41%，bootstrap Sharpe 为正的比例为 94.7%，但全样本换月 190 次、成本
+  约 46.1 万，仍应作为增强版候选而不是无条件替换 IC 近月基线。
 
 ## 严格三段式滚动样本外验证
 
@@ -49,4 +53,6 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 - `outputs/real_robustness/fixed_holdout_summary.csv`
 - `outputs/real_robustness/regime_summary.csv`
 - `outputs/real_robustness/implementation_stress.csv`
-- `outputs/full_robustness_liquidity/implementation_stress.csv`（四品种完整快照的最新执行压力矩阵）
+- `outputs/full_robustness/implementation_stress.csv`（四品种完整快照的最新执行压力矩阵）
+- `outputs/front_switch_walk_forward_summary.csv`
+- `outputs/full_research_report/strategy_vs_benchmark.png`

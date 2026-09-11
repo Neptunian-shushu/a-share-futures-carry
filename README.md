@@ -305,6 +305,23 @@ observed versus fair-value carry, reports up/down-market regimes, runs a seeded
 block bootstrap, and stresses transaction costs, execution spreads and margin rates. It is intended
 to expose fragility rather than to manufacture a single best configuration.
 
+The default configuration also reports an IC/IM front-month switch candidate. It compares
+only the two nearest contracts using the cost-adjusted carry score, applies a 0.2% annualized
+switch buffer, and rolls to the nearest expiry. Generate a focused comparison chart against
+the IC/IM baselines and the free 510500 raw-close benchmark with:
+
+```bash
+python scripts/plot_strategy_comparison.py
+```
+
+The strict out-of-sample comparison for this candidate is reproducible with:
+
+```bash
+python scripts/run_front_switch_walk_forward.py \
+  --data data/raw/cffex_panel_cffex_public_if_ih_ic_im.csv \
+  --config configs/strategy.yaml
+```
+
 ## Fair-value carry
 
 Set `carry.use_fair_value_adjustment: true` to calculate theoretical futures value from
@@ -340,6 +357,7 @@ execution and ETF total-return data against an independent source.
 - [x] Add cost-adjusted selection, rollover hysteresis and volatility targeting
 - [x] Add fixed-holdout, regime, bootstrap and margin/cost stress diagnostics
 - [x] Add volume-participation, row-level spread and execution stress diagnostics
+- [x] Add cost-aware IC/IM front-month switching with rollover hysteresis
 - [x] Extend the reproducible snapshot and diagnostics to IF/IH as well as IC/IM
 - [x] Produce research report and charts
 - [x] Add regression tests and GitHub Actions CI

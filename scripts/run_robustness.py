@@ -25,6 +25,7 @@ from a_share_futures_carry.strategy.allocation import (
 )
 from a_share_futures_carry.strategy.selection import (
     apply_roll_policy,
+    select_front_by_score,
     select_family_max_carry,
     select_max_carry,
     select_nth_expiry,
@@ -87,7 +88,31 @@ def _strategies(data: pd.DataFrame, cfg: dict) -> dict[str, pd.DataFrame]:
         score_column, strategy["min_volume"], strategy["min_open_interest"],
     )
     specs["dynamic_IC_IM_max_carry"] = dynamic
-    rolled = {name: _roll(candidate, data, cfg) for name, candidate in specs.items()}
+    front_switch_cfg = cfg.get("front_switch", {})
+    if front_switch_cfg.get("enabled", False):
+        front_switch = select_front_by_score(
+            data,
+            tuple(front_switch_cfg.get("eligible_families", strategy["eligible_families"])),
+            carry_column=score_column,
+            min_volume=strategy["min_volume"],
+            min_open_interest=strategy["min_open_interest"],
+        )
+        specs["dynamic_IC_IM_front_switch"] = apply_roll_policy(
+            front_switch,
+            data,
+            roll_before_expiry_days=front_switch_cfg.get("roll_before_expiry_days", 0),
+            min_dte=strategy["min_dte"],
+            max_dte=strategy["max_dte"],
+            score_column=score_column,
+            min_volume=strategy["min_volume"],
+            min_open_interest=strategy["min_open_interest"],
+            min_score_improvement=front_switch_cfg.get("roll_score_buffer", 0.0),
+            roll_to_nearest_expiry=True,
+        )
+    rolled = {
+        name: candidate if name == "dynamic_IC_IM_front_switch" else _roll(candidate, data, cfg)
+        for name, candidate in specs.items()
+    }
     allocation = cfg.get("allocation", {})
     dynamic_selected = rolled["dynamic_IC_IM_max_carry"]
     if not dynamic_selected.empty and allocation.get("enabled", False):
@@ -209,7 +234,8 @@ def main() -> None:
     base_data, base_strategies = prepared_by_mode["observed"]
     for strategy_name in (
         "IF_front", "IH_front", "IC_front", "IM_front",
-        "dynamic_IC_IM_max_carry", "dynamic_IC_IM_carry_vol_target",
+        "dynamic_IC_IM_max_carry", "dynamic_IC_IM_front_switch",
+        "dynamic_IC_IM_carry_vol_target",
     ):
         selected = base_strategies.get(strategy_name)
         if selected is None:

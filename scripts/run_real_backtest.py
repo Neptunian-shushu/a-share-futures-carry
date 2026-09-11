@@ -25,6 +25,7 @@ from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adju
 from a_share_futures_carry.strategy.allocation import add_dynamic_carry_allocation, add_volatility_target_allocation
 from a_share_futures_carry.strategy.selection import (
     apply_roll_policy,
+    select_front_by_score,
     select_family_max_carry,
     select_max_carry,
     select_nth_expiry,
@@ -176,6 +177,31 @@ def main() -> None:
     )
     dynamic = _with_roll_policy(dynamic, data, cfg)
     backtests["dynamic_IC_IM_max_carry"] = _run_one("dynamic_IC_IM_max_carry", dynamic, data, cfg)
+
+    front_switch_cfg = cfg.get("front_switch", {})
+    if front_switch_cfg.get("enabled", False):
+        front_switch = select_front_by_score(
+            data,
+            tuple(front_switch_cfg.get("eligible_families", strategy["eligible_families"])),
+            carry_column=selection_score_column,
+            min_volume=strategy["min_volume"],
+            min_open_interest=strategy["min_open_interest"],
+        )
+        front_switch = apply_roll_policy(
+            front_switch,
+            data,
+            roll_before_expiry_days=front_switch_cfg.get("roll_before_expiry_days", 0),
+            min_dte=strategy["min_dte"],
+            max_dte=strategy["max_dte"],
+            score_column=selection_score_column,
+            min_volume=strategy["min_volume"],
+            min_open_interest=strategy["min_open_interest"],
+            min_score_improvement=front_switch_cfg.get("roll_score_buffer", 0.0),
+            roll_to_nearest_expiry=True,
+        )
+        backtests["dynamic_IC_IM_front_switch"] = _run_one(
+            "dynamic_IC_IM_front_switch", front_switch, data, cfg
+        )
 
     allocation_cfg = cfg.get("allocation", {})
     if allocation_cfg.get("enabled", False) and not dynamic.empty:

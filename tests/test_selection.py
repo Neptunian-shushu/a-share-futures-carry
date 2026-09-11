@@ -1,6 +1,11 @@
 import pandas as pd
 
-from a_share_futures_carry.strategy.selection import apply_roll_policy, select_max_carry, select_nth_expiry
+from a_share_futures_carry.strategy.selection import (
+    apply_roll_policy,
+    select_front_by_score,
+    select_max_carry,
+    select_nth_expiry,
+)
 
 
 def sample_contracts():
@@ -24,6 +29,32 @@ def test_select_max_carry_across_families():
 def test_select_second_expiry_within_family():
     selected = select_nth_expiry(sample_contracts(), 2, ("IC",))
     assert selected.iloc[0]["contract"] == "IC2"
+
+
+def test_select_front_by_score_only_compares_front_contracts():
+    data = sample_contracts()
+    data["selection_score"] = [0.10, 0.90, 0.20, 0.30]
+    selected = select_front_by_score(data, ("IC", "IM"), "selection_score")
+    assert selected["contract"].tolist() == ["IM1"]
+
+
+def test_roll_policy_can_keep_expiry_roll_on_nearest_contract():
+    data = sample_contracts()
+    next_day = data.copy()
+    next_day["trade_date"] = pd.Timestamp("2026-01-06")
+    next_day["dte"] = next_day["dte"] - 1
+    data = pd.concat([data, next_day], ignore_index=True)
+    data["signal_carry"] = data["carry_ann"]
+    targets = data[data["contract"] == "IC1"].copy()
+    rolled = apply_roll_policy(
+        targets,
+        data,
+        roll_before_expiry_days=20,
+        min_dte=5,
+        max_dte=120,
+        roll_to_nearest_expiry=True,
+    )
+    assert rolled["contract"].tolist() == ["IC1", "IC2"]
 
 
 def test_roll_policy_does_not_pull_position_back_to_near_expiry_contract():

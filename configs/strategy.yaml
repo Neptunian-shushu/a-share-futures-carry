@@ -12,6 +12,12 @@ strategy:
   min_volume: 0
   min_open_interest: 0
 
+front_switch:
+  enabled: true
+  eligible_families: [IC, IM]
+  roll_before_expiry_days: 0
+  roll_score_buffer: 0.002
+
 carry:
   day_count: 365
   use_fair_value_adjustment: false

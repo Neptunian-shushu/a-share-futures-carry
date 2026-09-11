@@ -98,6 +98,35 @@ def select_family_max_carry(
     )
 
 
+def select_front_by_score(
+    contracts: pd.DataFrame,
+    eligible_families: tuple[str, ...] = ("IC", "IM"),
+    carry_column: str = "selection_score",
+    min_volume: float = 0.0,
+    min_open_interest: float = 0.0,
+) -> pd.DataFrame:
+    """Select the best-scoring front contract across eligible families."""
+    fronts = select_nth_expiry(
+        contracts,
+        1,
+        eligible_families,
+        carry_column=carry_column,
+        min_volume=min_volume,
+        min_open_interest=min_open_interest,
+    )
+    if fronts.empty:
+        return fronts
+    return (
+        fronts.sort_values(
+            ["trade_date", carry_column, "family", "contract"],
+            ascending=[True, False, True, True],
+        )
+        .drop_duplicates("trade_date", keep="first")
+        .sort_values("trade_date")
+        .reset_index(drop=True)
+    )
+
+
 def apply_roll_policy(
     targets: pd.DataFrame,
     contracts: pd.DataFrame,
@@ -108,6 +137,7 @@ def apply_roll_policy(
     min_volume: float = 0.0,
     min_open_interest: float = 0.0,
     min_score_improvement: float = 0.0,
+    roll_to_nearest_expiry: bool = False,
 ) -> pd.DataFrame:
     """Apply a deterministic expiry-roll rule to a daily target series.
 
@@ -155,6 +185,9 @@ def apply_roll_policy(
         reason = "initial" if held_contract is None else "signal"
         if force_roll:
             alternatives = eligible[eligible["contract"] != held_contract]
+            if roll_to_nearest_expiry and not alternatives.empty:
+                nearest_expiry = alternatives["expiry_date"].min()
+                alternatives = alternatives[alternatives["expiry_date"] == nearest_expiry]
             if not alternatives.empty:
                 chosen = alternatives.sort_values(
                     [score_column, "expiry_date", "contract"],
