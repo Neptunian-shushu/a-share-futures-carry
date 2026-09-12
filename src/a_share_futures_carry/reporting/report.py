@@ -19,6 +19,7 @@ def _display_strategy_name(name: str) -> str:
         "dynamic_IC_IM": "IC/IM动态",
         "carry_allocation": "Carry仓位", "carry_vol_target": "Carry+波动率目标",
         "CSI500_ETF_raw_close": "中证500 ETF（未含分红）",
+        "510500_total_return": "510500 ETF（含分红再投资）",
     }
     result = name
     for source, target in labels.items():
@@ -46,13 +47,16 @@ def price_benchmark_returns(
     date_column: str = "trade_date",
     price_column: str = "close",
     distribution_column: str | None = None,
+    split_factor_column: str | None = None,
 ) -> pd.Series:
     """Convert a dated ETF/index series into price or total-return returns.
 
     When ``distribution_column`` is supplied, its cash distribution per share
     is added to the current price before dividing by the prior price. This
     supports a true reinvested-distribution benchmark when the input contains
-    ex-date distributions.
+    ex-date distributions. ``split_factor_column`` can additionally carry a
+    new-shares-per-old-share factor on the first effective trading date after
+    a share split.
     """
     if date_column not in prices or price_column not in prices:
         raise ValueError(f"Benchmark requires {date_column} and {price_column}")
@@ -61,6 +65,10 @@ def price_benchmark_returns(
         if distribution_column not in prices:
             raise ValueError(f"Benchmark requires {distribution_column}")
         columns.append(distribution_column)
+    if split_factor_column is not None:
+        if split_factor_column not in prices:
+            raise ValueError(f"Benchmark requires {split_factor_column}")
+        columns.append(split_factor_column)
     series = prices[columns].copy()
     series[date_column] = pd.to_datetime(series[date_column])
     series[price_column] = pd.to_numeric(series[price_column], errors="coerce")
@@ -68,15 +76,22 @@ def price_benchmark_returns(
         series[distribution_column] = pd.to_numeric(series[distribution_column], errors="coerce").fillna(0.0)
         if (series[distribution_column] < 0).any():
             raise ValueError("Benchmark distributions must be non-negative")
+    if split_factor_column is not None:
+        series[split_factor_column] = pd.to_numeric(series[split_factor_column], errors="coerce").fillna(1.0)
+        if (series[split_factor_column] <= 0).any():
+            raise ValueError("Benchmark split factors must be strictly positive")
     if series[date_column].duplicated().any():
         raise ValueError("Benchmark contains duplicate dates")
     if (series[price_column] <= 0).any() or series[price_column].isna().any():
         raise ValueError("Benchmark prices must be strictly positive")
     series = series.sort_values(date_column).set_index(date_column)
+    effective_price = series[price_column]
+    if split_factor_column is not None:
+        effective_price = effective_price * series[split_factor_column]
     if distribution_column is None:
-        returns = series[price_column].pct_change()
+        returns = effective_price / series[price_column].shift(1) - 1.0
     else:
-        returns = (series[price_column] + series[distribution_column]) / series[price_column].shift(1) - 1.0
+        returns = (effective_price + series[distribution_column]) / series[price_column].shift(1) - 1.0
     return returns.fillna(0.0).rename("benchmark_return")
 
 
@@ -108,6 +123,7 @@ def price_benchmark_backtest(
     date_column: str = "trade_date",
     price_column: str = "close",
     distribution_column: str | None = None,
+    split_factor_column: str | None = None,
 ) -> pd.DataFrame:
     """Build a benchmark-shaped frame from an ETF or index price series."""
     return returns_benchmark_backtest(
@@ -116,6 +132,7 @@ def price_benchmark_backtest(
             date_column=date_column,
             price_column=price_column,
             distribution_column=distribution_column,
+            split_factor_column=split_factor_column,
         ),
         initial_nav,
     )

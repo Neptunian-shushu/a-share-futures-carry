@@ -90,6 +90,11 @@ def main() -> None:
         help="Optional per-share cash distribution column for a total-return benchmark",
     )
     parser.add_argument(
+        "--benchmark-split-factor-column",
+        default=None,
+        help="Optional new-shares-per-old-share column for split-adjusted total return",
+    )
+    parser.add_argument(
         "--carry-mode",
         choices=("config", "observed", "fair"),
         default="config",
@@ -239,6 +244,7 @@ def main() -> None:
             date_column=args.benchmark_date_column,
             price_column=args.benchmark_price_column,
             distribution_column=args.benchmark_distribution_column,
+            split_factor_column=args.benchmark_split_factor_column,
         )
         backtests[args.benchmark_name] = price_benchmark_backtest(
             benchmark_prices,
@@ -246,6 +252,7 @@ def main() -> None:
             date_column=args.benchmark_date_column,
             price_column=args.benchmark_price_column,
             distribution_column=args.benchmark_distribution_column,
+            split_factor_column=args.benchmark_split_factor_column,
         )
         for name in list(backtests):
             if name != args.benchmark_name and not name.endswith("_spot_benchmark"):

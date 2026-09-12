@@ -49,10 +49,16 @@ Sharpe 为 0.887、最大回撤为 -23.06%，相较 IC 近月基线的 13.68%、
 
 ## ETF 基准
 
-`download_etf_benchmark.py` 通过免费接口生成了 1,004 个交易日的 510500 ETF 快照，完整
-期间累计 raw close 收益为 8.32%。该序列明确标记为未含现金分红的收盘价，不能直接称为
-ETF 总回报；如果提供逐日现金分红列，主回测命令可通过
-`--benchmark-distribution-column` 合成再投资分红的 total return。
+`download_etf_benchmark.py` 通过免费行情和基金 F10 页面生成了 1,004 个交易日的 510500 ETF
+快照。CSV 保留原始收盘价，并加入除息日现金分红和份额拆分事件；本次样本包含 4 次现金分红，
+合计 0.389 元/份，并包含 2022-08-29 生效的 1:1.1454 份额拆分。回测用现金分红在除息日立即
+再投资、份额拆分只改变份额数不改变财富的口径计算总收益。
+
+因此，510500 原始收盘价累计收益为 8.32%，含分红再投资及份额拆分的 ETF 总收益累计为 31.42%，
+CAGR 为 6.83%，最大回撤为 -30.18%。分红与拆分来源为[东方财富基金 F10 分红送配页面]
+(https://fundf10.eastmoney.com/fhsp_510500.html)；主回测分别通过
+`--benchmark-distribution-column distribution` 和
+`--benchmark-split-factor-column split_factor` 传入事件列。
 
 ## 执行现实性与压力测试
 

@@ -46,3 +46,21 @@ def test_price_benchmark_can_include_cash_distributions():
         price_benchmark_backtest(prices, 1_000.0, distribution_column="distribution")["nav"].iloc[-1]
         - 1_020.2020202
     ) < 1e-6
+
+
+def test_price_benchmark_can_include_share_split_factor():
+    prices = pd.DataFrame(
+        {
+            "trade_date": ["2026-01-02", "2026-01-05", "2026-01-06"],
+            "close": [100.0, 50.0, 51.0],
+            "distribution": [0.0, 0.0, 1.0],
+            "split_factor": [1.0, 2.0, 1.0],
+        }
+    )
+    returns = price_benchmark_returns(
+        prices,
+        distribution_column="distribution",
+        split_factor_column="split_factor",
+    )
+    assert abs(returns.iloc[1]) < 1e-12
+    assert abs(returns.iloc[2] - 0.04) < 1e-12

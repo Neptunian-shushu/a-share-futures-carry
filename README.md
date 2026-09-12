@@ -242,8 +242,8 @@ python scripts/run_real_backtest.py \
 ```
 
 Each family comparison includes a spot-index buy-and-hold benchmark. An ETF can be
-compared by passing a separate dated price CSV; this keeps the cash-index benchmark
-separate from dividend-adjusted ETF data while reporting the ETF on the same date axis:
+compared by passing a separate dated price CSV; the CSV may include per-share cash
+distributions and split factors so the report uses a reinvested total-return series:
 
 ```bash
 python scripts/run_real_backtest.py \
@@ -251,13 +251,17 @@ python scripts/run_real_backtest.py \
   --config configs/strategy.yaml \
   --benchmark data/raw/etf.csv \
   --benchmark-name CSI500_ETF \
-  --benchmark-price-column adj_close
+  --benchmark-price-column close \
+  --benchmark-distribution-column distribution \
+  --benchmark-split-factor-column split_factor
 ```
 
 The benchmark CSV must contain a unique date column (default `trade_date`) and strictly
 positive prices (default `close`).
 If it also contains a non-negative per-share cash distribution column, pass
 `--benchmark-distribution-column` to calculate reinvested-distribution returns.
+If the history includes a share split, pass a `split_factor` column containing
+new shares per old share on the first effective trading session.
 
 Generate a free 510500 benchmark snapshot with:
 
@@ -269,9 +273,22 @@ python scripts/download_etf_benchmark.py \
   --output data/raw/etf_510500_sina.csv
 ```
 
-The Sina endpoint supplies raw close prices. The sidecar records this limitation;
-for a true ETF total-return comparison, replace `close` with a reinvested-distribution
-or adjusted-total-return series and pass that column through `--benchmark-price-column`.
+The generated CSV contains the Sina raw close, a `distribution` column with
+per-share cash distributions aligned to the ex-dividend date, and a `split_factor`
+column for share splits. The dividend/split events are read from the public
+Eastmoney fund F10 page; the sidecar records the source and semantics. Use the
+following flags for a benchmark that includes cash distributions reinvested on
+the ex-dividend date:
+
+```bash
+python scripts/run_real_backtest.py \
+  --data data/raw/cffex_panel.csv \
+  --config configs/strategy.yaml \
+  --benchmark data/raw/etf_510500_sina.csv \
+  --benchmark-name 510500_total_return \
+  --benchmark-distribution-column distribution \
+  --benchmark-split-factor-column split_factor
+```
 
 For parameter selection, run the walk-forward study. Thresholds are selected on each
 training window and evaluated on the following test window:
@@ -308,7 +325,7 @@ to expose fragility rather than to manufacture a single best configuration.
 The default configuration also reports an IC/IM front-month switch candidate. It compares
 only the two nearest contracts using the cost-adjusted carry score, applies a 0.2% annualized
 switch buffer, and rolls to the nearest expiry. Generate a focused comparison chart against
-the IC/IM baselines and the free 510500 raw-close benchmark with:
+the IC/IM baselines and the free 510500 total-return benchmark with:
 
 ```bash
 python scripts/plot_strategy_comparison.py

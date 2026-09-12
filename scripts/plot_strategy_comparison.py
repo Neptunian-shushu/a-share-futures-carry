@@ -12,7 +12,7 @@ LABELS = {
     "dynamic_IC_IM_front_switch": "IC/IM近月动态切换",
     "IC_front": "IC近月基线",
     "IM_front": "IM近月基线",
-    "510500_raw_close": "510500 ETF（未含分红）",
+    "510500_total_return": "510500 ETF（含分红再投资）",
 }
 
 
@@ -53,7 +53,7 @@ def main() -> None:
         "dynamic_IC_IM_front_switch": "#c23b22",
         "IC_front": "#1f77b4",
         "IM_front": "#2ca02c",
-        "510500_raw_close": "#7f7f7f",
+        "510500_total_return": "#7f7f7f",
     }
     for name in wanted:
         group = curves[curves["strategy"].eq(name)]
@@ -61,7 +61,7 @@ def main() -> None:
             continue
         first = float(group["wealth"].iloc[0])
         normalized = group["wealth"] / first if first else group["wealth"]
-        line_style = "--" if name == "510500_raw_close" else "-"
+        line_style = "--" if name == "510500_total_return" else "-"
         ax.plot(
             group["trade_date"], normalized,
             label=LABELS[name], color=colors[name], linewidth=2.0 if name == "dynamic_IC_IM_front_switch" else 1.5,
@@ -80,7 +80,7 @@ def main() -> None:
         ha="right",
         color="#555555",
     )
-    ax.set_title("IC/IM近月动态切换 vs 基线与510500 ETF")
+    ax.set_title("IC/IM近月动态切换 vs 基线与510500 ETF总收益基准")
     ax.set_ylabel("累计净值（起点=1）")
     ax.set_xlabel("交易日期")
     ax.grid(alpha=0.25)
