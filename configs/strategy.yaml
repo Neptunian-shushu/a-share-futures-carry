@@ -16,7 +16,10 @@ front_switch:
   enabled: true
   eligible_families: [IC, IM]
   roll_before_expiry_days: 0
-  roll_score_buffer: 0.002
+  # Require a meaningful annualized carry advantage before switching families.
+  # Long-sample rolling OOS tests favored 1.5%-2.5%; 2.0% is the rounded
+  # production-facing choice that reduces turnover without worsening drawdown.
+  roll_score_buffer: 0.02
 
 risk_control:
   enabled: true

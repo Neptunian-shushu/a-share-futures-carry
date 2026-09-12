@@ -372,7 +372,7 @@ python scripts/run_nested_walk_forward.py \
 ```
 
 The default configuration also reports an IC/IM front-month switch candidate. It compares
-only the two nearest contracts using the cost-adjusted carry score, applies a 0.2% annualized
+only the two nearest contracts using the cost-adjusted carry score, applies a 2.0% annualized
 switch buffer, and rolls to the nearest expiry. Generate a focused comparison chart against
 the IC/IM baselines and the free 510500 total-return benchmark with:
 
