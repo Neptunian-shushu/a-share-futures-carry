@@ -173,7 +173,7 @@ def _candidate_grid() -> list[dict[str, object]]:
     grid: list[dict[str, object]] = []
     for score_mode in ("observed", "net"):
         for switch_buffer in (0.0, 0.005, 0.02, 0.03):
-            for beta_target in (None, 0.6, 0.9):
+            for beta_target in (None, 0.5, 0.6, 0.9):
                 for downtrend_weight in (1.0, 0.75):
                     for high_volatility_weight in (1.0, 0.75):
                         grid.append(
