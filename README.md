@@ -19,6 +19,8 @@ The key point is that this is **not market-neutral arbitrage**. A long futures p
 3. Second-month futures roll
 4. Maximum annualized carry contract within each family
 5. Dynamic IC/IM maximum-carry selection
+6. Cost-aware IC/IM near-month switching
+7. Beta-targeted position sizing and optional market-regime filter
 
 ## Core definitions
 
@@ -31,6 +33,14 @@ A later research stage will estimate fair-value basis using expected dividends a
 `excess carry = observed carry - fair-value carry`
 
 This distinction matters because not all futures discount is alpha.
+
+The executable net-carry interface is:
+
+`net carry = observed carry + dividend yield - funding rate - annualized switch cost`
+
+Row-level `funding_rate` and `dividend_yield` values override scalar configuration defaults. If only
+scalar assumptions are available, the adjustment is common across contracts on a date and therefore
+does not change the ranking; the report marks this explicitly rather than treating it as new alpha.
 
 ## Project structure
 
@@ -146,6 +156,20 @@ Monthly ZIP files are cached locally so an interrupted run can resume without
 redownloading completed months. Expiry dates are inferred from contract months and must
 still be checked against exchange metadata before production use.
 
+To expand the control sample to the full free CFFEX history, use:
+
+```bash
+python scripts/download_cffex_public.py \
+  --families IF IH IC IM \
+  --start 20150105 \
+  --end 20260909 \
+  --output data/raw/cffex_panel_cffex_public_if_ih_ic_im_long.csv
+```
+
+This gives IF history from 2015-01-05, IH/IC from 2015-04-16 and IM from its 2022-07-22
+listing date. The long sample is useful for control strategies; IC/IM comparisons must
+state how the pre-IM period is handled.
+
 ## Normalized data schema
 
 Required columns:
@@ -221,14 +245,26 @@ input is required for accurate roll-day marking.
 
 The default research design caps futures notional exposure at 1.0x NAV. Margin availability is **not** treated as permission to lever the equity beta. The engine applies a configurable margin rate and buffer, integer sizing, volume participation caps, optional row-level spread costs and explicit turnover costs. The robustness runner stresses 0.5x/1x/2x commissions and slippage, 0/1/2bp spreads, and 8%/12%/20% margin rates. Production implementation should still calibrate exchange-specific margin schedules, limit moves and live executable prices.
 
+The default research candidate applies a 60-session rolling futures-vs-spot beta estimate and targets
+Beta=0.9. This reduces notional exposure when realized beta is high while retaining the same carry selector.
+The optional state filter identifies a negative 63-session market momentum or a 20-session volatility above
+its trailing 80th percentile, then applies configurable exposure weights. It is disabled by default because
+nested out-of-sample selection found that it improved drawdown only with a material CAGR cost.
+
+The engine accepts dated `spread_bps` observations and volume participation limits. The current free snapshot
+has volume but no bid/ask quotes, so its 0/1/2bp spread matrix is an explicit sensitivity analysis, not a
+reconstruction of executable market depth. Once quote data is available, populate `spread_bps` and rerun the
+same commands; missing spread coverage is reported in the summary.
+
 ## Research reports
 
 The real-data runner compares front month, second month, family max-carry, dynamic IC/IM
-max-carry, and historical carry-percentile allocation. It writes:
+max-carry, near-month switching, Beta-targeted sizing and historical carry-percentile allocation. It writes:
 
 - `strategy_summary.csv`: return, risk, beta, costs, PnL decomposition, turnover and margin diagnostics
 - `equity_curves.csv` and `monthly_returns.csv`
 - `roll_events.csv`
+- `nested_walk_forward/*.csv` from the nested parameter-selection study
 - `nav_curves.png`, `drawdowns.png`, `cagr_comparison.png`, and `pnl_decomposition.png`
 
 For example:
@@ -322,6 +358,19 @@ observed versus fair-value carry, reports up/down-market regimes, runs a seeded
 block bootstrap, and stresses transaction costs, execution spreads and margin rates. It is intended
 to expose fragility rather than to manufacture a single best configuration.
 
+The nested search over carry mode, switch buffer, Beta target and regime weights is reproducible with:
+
+```bash
+python scripts/run_nested_walk_forward.py \
+  --data data/raw/cffex_panel_cffex_public_ic_im.csv \
+  --config configs/strategy.yaml \
+  --train-sessions 252 \
+  --validation-sessions 63 \
+  --test-sessions 63 \
+  --step-sessions 63 \
+  --output-dir outputs/nested_walk_forward
+```
+
 The default configuration also reports an IC/IM front-month switch candidate. It compares
 only the two nearest contracts using the cost-adjusted carry score, applies a 0.2% annualized
 switch buffer, and rolls to the nearest expiry. Generate a focused comparison chart against
@@ -339,13 +388,16 @@ python scripts/run_front_switch_walk_forward.py \
   --config configs/strategy.yaml
 ```
 
-## Fair-value carry
+## Fair-value and net carry
 
 Set `carry.use_fair_value_adjustment: true` to calculate theoretical futures value from
 funding and dividend yields and select on `excess_carry`. Row-level
 `funding_rate`/`dividend_yield` values take precedence over the scalar config defaults.
 The default configuration keeps observed carry selection for backward compatibility;
 research conclusions should report both versions.
+Net Carry is available through `net_carry.enabled`. It becomes economically informative only when
+the panel supplies contract/date-specific funding and dividend forecasts; scalar defaults are kept for
+reproducibility but do not alter the current contract ranking.
 
 ## Current limitations
 
@@ -379,13 +431,14 @@ execution and ETF total-return data against an independent source.
 - [x] Produce research report and charts
 - [x] Add regression tests and GitHub Actions CI
 - [x] Add free ETF benchmark snapshot tooling and price-semantics metadata
+- [x] Add Beta-targeted sizing, optional market-state filter and nested Walk-forward selection
+- [x] Expand the reproducible CFFEX snapshot to the full free IF/IH/IC/IM history
 
-The next research milestone is not another selector: it is a fixed historical data
-snapshot, independent-data reconciliation, walk-forward parameter selection, and
-out-of-sample performance attribution by beta, basis convergence, collateral yield,
-turnover and costs. The repository now provides commands for each of those steps;
-the remaining work is to run them against authenticated historical snapshots and
-calibrate the resulting assumptions to exchange records.
+The current research milestone is complete for the free-data route: a fixed historical snapshot,
+independent reconciliation, Beta/risk overlays, net Carry inputs, nested parameter selection,
+out-of-sample attribution and implementation stress diagnostics are all available. The remaining
+production gate is external data quality: row-level forward dividends/funding, real bid/ask quotes,
+exchange margin schedules and an independent long-history reconciliation.
 
 ## Disclaimer
 

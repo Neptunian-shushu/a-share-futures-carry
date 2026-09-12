@@ -1,20 +1,23 @@
 # 固定留出集与稳健性分析
 
-数据快照：`data/raw/cffex_panel_cffex_public_ic_im.csv`  
+数据快照：`data/raw/cffex_panel_cffex_public_if_ih_ic_im.csv`  
 历史期间：2022-07-22 至 2026-09-09  
 最终留出集：252 个交易日，2025-08-27 至 2026-09-09  
 回测交易成本：每次成交名义金额 1bp；选合约时额外按剩余到期日折算 2bp 换仓成本。  
-Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种子 42。
+Bootstrap：500 次重采样，连续 20 个交易日为一个区块，随机种子 42。
 
 ## 留出集结果
 
 | Carry 模式 | 策略 | CAGR | Sharpe | 最大回撤 | Bootstrap Sharpe 5%分位 | P(Sharpe > 0) |
 |---|---|---:|---:|---:|---:|---:|
+| 观察 carry | IF 近月 | 9.59% | 0.666 | -7.77% | -0.516 | 83.8% |
+| 观察 carry | IH 近月 | 4.52% | 0.396 | -11.17% | -0.882 | 70.6% |
 | 观察 carry | IC 近月 | 21.46% | 0.926 | -16.73% | -0.685 | 80.7% |
 | 观察 carry | IC 最大 carry | 18.86% | 0.815 | -17.82% | -0.763 | 78.3% |
 | 观察 carry | IM 近月 | 14.90% | 0.714 | -19.82% | -0.825 | 75.3% |
 | 观察 carry | IC/IM 动态最大 carry | 12.24% | 0.605 | -18.11% | -0.904 | 74.7% |
 | 观察 carry | IC/IM 近月动态切换 | 27.30% | 1.194 | -14.41% | -0.039 | 94.7% |
+| 观察 carry | IC/IM Beta目标仓位（目标 Beta=0.9） | 21.43% | 1.087 | -14.39% | -0.304 | 91.6% |
 | 观察 carry | 动态 carry 仓位 | 4.31% | 0.517 | -6.89% | -1.209 | 63.7% |
 | 观察 carry | carry + 波动率目标 | 1.92% | 0.814 | -2.62% | -1.198 | 70.0% |
 
@@ -30,7 +33,7 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 - 市场状态拆分显示，留出集收益主要来自上涨市场；下跌市场表现仍为负。这再次确认策略是
   “长期权益 beta + 基差收益”，而不是市场中性套利。
 - 新增的执行层压力矩阵覆盖 0.5/1/2 倍佣金与滑点、0/1/2bp 价差、8%/12%/20% 保证金率和
-  0.1%/1%/10% 成交量参与率，共 567 个情景。所有情景均没有追加保证金；0.1% 参与率下只有
+  0.1%/1%/10% 成交量参与率，共 729 个情景。所有情景均没有追加保证金；0.1% 参与率下只有
   IH 近月 5 个交易日、动态最大 carry 2 个交易日出现成交量约束，其余策略没有被约束。
 - 在这组压力情景中，IC 近月的最差 CAGR 仍为 19.70%，IM 近月为 12.27%，而动态最大 carry
   的最差 CAGR 为 4.70%，并且交易成本可达到约 103.7 万；这强化了近月基线相对于复杂最大 carry
@@ -38,6 +41,12 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 - IC/IM 近月动态切换只比较近月合约，并使用 0.2% 年化换仓门槛；留出集 CAGR 27.30%、Sharpe
   1.194、最大回撤 -14.41%，bootstrap Sharpe 为正的比例为 94.7%，但全样本换月 190 次、成本
   约 46.1 万，仍应作为增强版候选而不是无条件替换 IC 近月基线。
+- Beta 目标仓位将留出集平均敞口从约 99.2% 降至 95.2%，CAGR 下降但回撤基本不变；它的价值是
+  风险预算可解释、可配置，不是额外 alpha。默认配置采用目标 Beta=0.9，市场状态过滤默认关闭，
+  但仍由嵌套 Walk-forward 搜索其是否在特定窗口有效。
+- 净 Carry 已加入逐行 `funding_rate`、`dividend_yield` 和换仓成本接口；当前免费快照没有逐合约
+  远期资金/股息预测，使用统一标量时只改变信号水平、不改变排序，因此净 Carry 与观察 carry
+  路径完全一致。获得逐行预测后即可直接复跑，不需要改回测引擎。
 
 ## 严格三段式滚动样本外验证
 
@@ -48,11 +57,29 @@ Bootstrap：300 次重采样，连续 20 个交易日为一个区块，随机种
 
 机器可读结果：`outputs/real_walk_forward_strict_summary.csv`。
 
+## 嵌套 Walk-forward 参数选择
+
+新增的嵌套验证把每个窗口拆成训练、验证、测试三段，并仅在验证集选择 carry 模式、换仓门槛、Beta
+目标和状态权重，测试段只用于最终评价。10 个测试窗口的拼接结果如下：
+
+| 策略 | CAGR | Sharpe | 最大回撤 | 月度正收益率 |
+|---|---:|---:|---:|---:|
+| 嵌套选择 | 23.01% | 1.181 | -16.56% | 71.88% |
+| 近月动态切换基线 | 28.52% | 1.214 | -20.66% | 68.75% |
+
+风险选择换取了约 4.1 个百分点回撤改善和约 3.1 个百分点月度正收益率改善，但 CAGR 低约 5.5
+个百分点，故当前最终建议是“动态切换 + Beta 目标仓位”作为稳健候选，“状态过滤”作为可选开关，
+而不是把验证结果包装成确定性增强。
+
 ## 机器可读输出
 
 - `outputs/real_robustness/fixed_holdout_summary.csv`
 - `outputs/real_robustness/regime_summary.csv`
 - `outputs/real_robustness/implementation_stress.csv`
 - `outputs/full_robustness/implementation_stress.csv`（四品种完整快照的最新执行压力矩阵）
+- `outputs/nested_walk_forward/candidate_validation_scores.csv`
+- `outputs/nested_walk_forward/nested_walk_forward_summary.csv`
+- `outputs/nested_walk_forward/nested_walk_forward_aggregate.csv`
+- `outputs/long_strategy_summary.csv`
 - `outputs/front_switch_walk_forward_summary.csv`
 - `outputs/full_research_report/strategy_vs_benchmark.png`
