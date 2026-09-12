@@ -20,15 +20,18 @@ front_switch:
 
 risk_control:
   enabled: true
-  target_beta: 0.8
+  # Default production-facing candidate: reduce equity beta without
+  # suppressing the strategy during every downtrend/high-volatility spell.
+  target_beta: 0.9
+  regime_enabled: false
   beta_lookback: 60
   beta_min_periods: 20
   momentum_lookback: 63
   volatility_lookback: 20
   volatility_quantile_lookback: 252
   volatility_quantile: 0.8
-  downtrend_weight: 0.5
-  high_volatility_weight: 0.5
+  downtrend_weight: 0.75
+  high_volatility_weight: 0.75
   max_weight: 1.0
 
 carry:

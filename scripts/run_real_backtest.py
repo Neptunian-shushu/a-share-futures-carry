@@ -255,23 +255,24 @@ def main() -> None:
             backtests["dynamic_IC_IM_beta_target"] = _run_one(
                 "dynamic_IC_IM_beta_target", beta_selected, data, cfg
             )
-            risk_selected = add_risk_overlay(
-                front_switch,
-                target_beta=risk_cfg.get("target_beta", 0.8),
-                beta_lookback=risk_cfg.get("beta_lookback", 60),
-                beta_min_periods=risk_cfg.get("beta_min_periods", 20),
-                momentum_lookback=risk_cfg.get("momentum_lookback", 63),
-                volatility_lookback=risk_cfg.get("volatility_lookback", 20),
-                volatility_quantile_lookback=risk_cfg.get("volatility_quantile_lookback", 252),
-                volatility_quantile=risk_cfg.get("volatility_quantile", 0.8),
-                downtrend_weight=risk_cfg.get("downtrend_weight", 0.5),
-                high_volatility_weight=risk_cfg.get("high_volatility_weight", 0.5),
-                max_weight=risk_cfg.get("max_weight", 1.0),
-                periods_per_year=carry_cfg.get("trading_days_per_year", 252),
-            )
-            backtests["dynamic_IC_IM_beta_regime"] = _run_one(
-                "dynamic_IC_IM_beta_regime", risk_selected, data, cfg
-            )
+            if risk_cfg.get("regime_enabled", True):
+                risk_selected = add_risk_overlay(
+                    front_switch,
+                    target_beta=risk_cfg.get("target_beta", 0.8),
+                    beta_lookback=risk_cfg.get("beta_lookback", 60),
+                    beta_min_periods=risk_cfg.get("beta_min_periods", 20),
+                    momentum_lookback=risk_cfg.get("momentum_lookback", 63),
+                    volatility_lookback=risk_cfg.get("volatility_lookback", 20),
+                    volatility_quantile_lookback=risk_cfg.get("volatility_quantile_lookback", 252),
+                    volatility_quantile=risk_cfg.get("volatility_quantile", 0.8),
+                    downtrend_weight=risk_cfg.get("downtrend_weight", 0.5),
+                    high_volatility_weight=risk_cfg.get("high_volatility_weight", 0.5),
+                    max_weight=risk_cfg.get("max_weight", 1.0),
+                    periods_per_year=carry_cfg.get("trading_days_per_year", 252),
+                )
+                backtests["dynamic_IC_IM_beta_regime"] = _run_one(
+                    "dynamic_IC_IM_beta_regime", risk_selected, data, cfg
+                )
 
     allocation_cfg = cfg.get("allocation", {})
     if allocation_cfg.get("enabled", False) and not dynamic.empty:

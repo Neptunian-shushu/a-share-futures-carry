@@ -131,20 +131,21 @@ def _strategies(data: pd.DataFrame, cfg: dict) -> dict[str, pd.DataFrame]:
                 min_periods=risk_cfg.get("beta_min_periods", 20),
                 max_weight=risk_cfg.get("max_weight", 1.0),
             )
-            specs["dynamic_IC_IM_beta_regime"] = add_risk_overlay(
-                specs["dynamic_IC_IM_front_switch"],
-                target_beta=risk_cfg.get("target_beta", 0.8),
-                beta_lookback=risk_cfg.get("beta_lookback", 60),
-                beta_min_periods=risk_cfg.get("beta_min_periods", 20),
-                momentum_lookback=risk_cfg.get("momentum_lookback", 63),
-                volatility_lookback=risk_cfg.get("volatility_lookback", 20),
-                volatility_quantile_lookback=risk_cfg.get("volatility_quantile_lookback", 252),
-                volatility_quantile=risk_cfg.get("volatility_quantile", 0.8),
-                downtrend_weight=risk_cfg.get("downtrend_weight", 0.5),
-                high_volatility_weight=risk_cfg.get("high_volatility_weight", 0.5),
-                max_weight=risk_cfg.get("max_weight", 1.0),
-                periods_per_year=cfg["carry"].get("trading_days_per_year", 252),
-            )
+            if risk_cfg.get("regime_enabled", True):
+                specs["dynamic_IC_IM_beta_regime"] = add_risk_overlay(
+                    specs["dynamic_IC_IM_front_switch"],
+                    target_beta=risk_cfg.get("target_beta", 0.8),
+                    beta_lookback=risk_cfg.get("beta_lookback", 60),
+                    beta_min_periods=risk_cfg.get("beta_min_periods", 20),
+                    momentum_lookback=risk_cfg.get("momentum_lookback", 63),
+                    volatility_lookback=risk_cfg.get("volatility_lookback", 20),
+                    volatility_quantile_lookback=risk_cfg.get("volatility_quantile_lookback", 252),
+                    volatility_quantile=risk_cfg.get("volatility_quantile", 0.8),
+                    downtrend_weight=risk_cfg.get("downtrend_weight", 0.5),
+                    high_volatility_weight=risk_cfg.get("high_volatility_weight", 0.5),
+                    max_weight=risk_cfg.get("max_weight", 1.0),
+                    periods_per_year=cfg["carry"].get("trading_days_per_year", 252),
+                )
         net_cfg = cfg.get("net_carry", {})
         if net_cfg.get("enabled", False):
             net_column = net_cfg.get("output_column", "net_carry_score")
@@ -300,6 +301,7 @@ def main() -> None:
     for strategy_name in (
         "IF_front", "IH_front", "IC_front", "IM_front",
         "dynamic_IC_IM_max_carry", "dynamic_IC_IM_front_switch",
+        "dynamic_IC_IM_beta_target",
         "dynamic_IC_IM_beta_regime",
         "dynamic_IC_IM_net_carry_front_switch",
         "dynamic_IC_IM_carry_vol_target",

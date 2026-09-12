@@ -10,11 +10,8 @@ import pandas as pd
 
 LABELS = {
     "dynamic_IC_IM_front_switch": "IC/IM近月动态切换",
-    "dynamic_IC_IM_beta_regime": "IC/IM Beta+状态过滤",
     "dynamic_IC_IM_beta_target": "IC/IM Beta目标仓位",
-    "dynamic_IC_IM_net_carry_front_switch": "IC/IM净Carry动态切换",
     "IC_front": "IC近月基线",
-    "IM_front": "IM近月基线",
     "510500_total_return": "510500 ETF（含分红再投资）",
 }
 
@@ -86,7 +83,7 @@ def main() -> None:
         ha="right",
         color="#555555",
     )
-    ax.set_title("IC/IM近月动态切换 vs 基线与510500 ETF总收益基准")
+    ax.set_title("IC/IM策略、Beta风险控制与510500 ETF总收益基准")
     ax.set_ylabel("累计净值（起点=1）")
     ax.set_xlabel("交易日期")
     ax.grid(alpha=0.25)
