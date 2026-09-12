@@ -388,6 +388,18 @@ python scripts/run_front_switch_walk_forward.py \
   --config configs/strategy.yaml
 ```
 
+生成分年度收益和风险表：
+
+```bash
+python scripts/report_annual_performance.py \
+  --curves outputs/full_research_report/equity_curves.csv \
+  --output outputs/full_research_report/annual_performance.csv \
+  --markdown-output outputs/full_research_report/annual_performance.md
+```
+
+结果包含年度收益、年化波动、Sharpe、最大回撤、正收益日/月比例以及年度实际起止日期；
+首尾不完整年度会被标记。
+
 ## Fair-value and net carry
 
 Set `carry.use_fair_value_adjustment: true` to calculate theoretical futures value from
