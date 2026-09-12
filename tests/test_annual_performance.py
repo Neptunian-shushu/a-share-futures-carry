@@ -38,3 +38,18 @@ def test_annual_return_table_pivots_strategy_labels():
 
     assert list(table.columns) == ["year", "A", "B"]
     assert table.loc[0, "A"] == 0.1
+
+
+def test_standalone_im_curve_starts_at_listing_date():
+    curves = pd.DataFrame(
+        {
+            "strategy": ["IM_front", "IM_front"],
+            "trade_date": pd.to_datetime(["2021-12-31", "2022-07-22"]),
+            "return": [0.01, 0.10],
+        }
+    )
+
+    result = build_annual_performance(curves, strategies=["IM_front"])
+
+    assert result["year"].tolist() == [2022]
+    assert result.loc[0, "total_return"] == pytest.approx(0.10)

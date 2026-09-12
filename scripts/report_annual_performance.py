@@ -10,6 +10,8 @@ import pandas as pd
 
 
 LABELS = {
+    "IF_front": "IF近月基线",
+    "IH_front": "IH近月基线",
     "dynamic_IC_IM_front_switch": "IC/IM近月动态切换",
     "dynamic_IC_IM_beta_target": "IC/IM Beta目标仓位",
     "IC_front": "IC近月基线",
@@ -17,6 +19,15 @@ LABELS = {
     "dynamic_IC_IM_max_carry": "IC/IM动态最大Carry",
     "dynamic_IC_IM_carry_vol_target": "动态Carry+波动率目标",
     "510500_total_return": "510500 ETF总收益",
+}
+
+# IM was listed on 2022-07-22.  The long backtest keeps the full calendar so
+# composite strategies can fall back to IC before that date, but the standalone
+# IM curve contains inactive rows before listing.  Exclude those rows from the
+# standalone annual report instead of treating collateral-only wealth as IM
+# performance.
+MIN_START_DATES = {
+    "IM_front": pd.Timestamp("2022-07-22"),
 }
 
 
@@ -54,6 +65,15 @@ def build_annual_performance(
     frame = frame.dropna(subset=["strategy", "trade_date", "return"])
     if strategies is not None:
         frame = frame[frame["strategy"].isin(strategies)]
+    if not frame.empty:
+        frame = frame[
+            frame.apply(
+                lambda row: row["trade_date"] >= MIN_START_DATES.get(
+                    row["strategy"], pd.Timestamp.min
+                ),
+                axis=1,
+            )
+        ]
     if frame.empty:
         raise ValueError("No requested strategy curves found")
 

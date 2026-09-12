@@ -380,6 +380,17 @@ the IC/IM baselines and the free 510500 total-return benchmark with:
 python scripts/plot_strategy_comparison.py
 ```
 
+生成覆盖 2015 年以来的长样本策略曲线：
+
+```bash
+python scripts/plot_strategy_comparison.py \
+  --curves outputs/long_research_report/equity_curves.csv \
+  --output outputs/long_research_report/strategy_curves.png \
+  --strategies IF_front IH_front IC_front IM_front \
+    dynamic_IC_IM_front_switch dynamic_IC_IM_beta_target \
+    dynamic_IC_IM_max_carry 510500_total_return
+```
+
 The strict out-of-sample comparison for this candidate is reproducible with:
 
 ```bash
@@ -392,13 +403,13 @@ python scripts/run_front_switch_walk_forward.py \
 
 ```bash
 python scripts/report_annual_performance.py \
-  --curves outputs/full_research_report/equity_curves.csv \
-  --output outputs/full_research_report/annual_performance.csv \
-  --markdown-output outputs/full_research_report/annual_performance.md
+  --curves outputs/long_research_report/equity_curves.csv \
+  --output outputs/long_research_report/annual_performance.csv \
+  --markdown-output outputs/long_research_report/annual_performance.md
 ```
 
-结果包含年度收益、年化波动、Sharpe、最大回撤、正收益日/月比例以及年度实际起止日期；
-首尾不完整年度会被标记。
+结果包含 2015 年以来的年度收益、年化波动、Sharpe、最大回撤、正收益日/月比例以及年度实际起止日期；
+首尾不完整年度会被标记。IM 近月基线从其上市日 2022-07-22 起统计，动态 IC/IM 策略在此之前由 IC 承接。
 
 ## Fair-value and net carry
 
