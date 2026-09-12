@@ -116,3 +116,54 @@ def add_cost_adjusted_carry(
     out[output_column] = out[output_column].where(carry.notna() & dte.gt(0))
     out["switch_cost_ann"] = annualized_switch_cost.where(dte.gt(0))
     return out
+
+
+def add_net_carry_score(
+    df: pd.DataFrame,
+    *,
+    carry_column: str = "carry_ann",
+    funding_rate_annual: float = 0.0,
+    dividend_yield_annual: float = 0.0,
+    switch_cost_bps: float = 0.0,
+    day_count: int = 365,
+    dte_column: str = "dte",
+    funding_column: str = "funding_rate",
+    dividend_column: str = "dividend_yield",
+    output_column: str = "net_carry_score",
+) -> pd.DataFrame:
+    """Build a net annualized carry score after funding, dividends and roll cost.
+
+    ``carry_column`` is the observed annualized discount. The score adds the
+    expected dividend yield, subtracts funding, and subtracts the configured
+    switch cost annualized over the contract's remaining days. Optional
+    row-level funding/dividend forecasts take precedence over scalar fallbacks.
+    This is a transparent research score, not a claim that the forecasts are
+    realized cash flows.
+    """
+    if carry_column not in df:
+        raise ValueError(f"Missing carry column: {carry_column}")
+    if dte_column not in df:
+        raise ValueError(f"Missing DTE column: {dte_column}")
+    if switch_cost_bps < 0 or day_count <= 0:
+        raise ValueError("switch_cost_bps must be non-negative and day_count must be positive")
+
+    out = df.copy()
+    carry = pd.to_numeric(out[carry_column], errors="coerce")
+    dte = pd.to_numeric(out[dte_column], errors="coerce")
+    funding = (
+        pd.to_numeric(out[funding_column], errors="coerce").fillna(funding_rate_annual)
+        if funding_column in out
+        else pd.Series(funding_rate_annual, index=out.index, dtype=float)
+    )
+    dividend = (
+        pd.to_numeric(out[dividend_column], errors="coerce").fillna(dividend_yield_annual)
+        if dividend_column in out
+        else pd.Series(dividend_yield_annual, index=out.index, dtype=float)
+    )
+    switch_cost = (switch_cost_bps / 10_000.0) * day_count / dte.where(dte > 0)
+    out["net_funding_rate"] = funding
+    out["net_dividend_yield"] = dividend
+    out["net_switch_cost_ann"] = switch_cost.where(dte > 0)
+    out[output_column] = carry + dividend - funding - switch_cost
+    out[output_column] = out[output_column].where(carry.notna() & dte.gt(0))
+    return out

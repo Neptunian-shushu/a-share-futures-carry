@@ -18,11 +18,31 @@ front_switch:
   roll_before_expiry_days: 0
   roll_score_buffer: 0.002
 
+risk_control:
+  enabled: true
+  target_beta: 0.8
+  beta_lookback: 60
+  beta_min_periods: 20
+  momentum_lookback: 63
+  volatility_lookback: 20
+  volatility_quantile_lookback: 252
+  volatility_quantile: 0.8
+  downtrend_weight: 0.5
+  high_volatility_weight: 0.5
+  max_weight: 1.0
+
 carry:
   day_count: 365
   use_fair_value_adjustment: false
   funding_rate_annual: 0.02
   dividend_yield_annual: 0.015
+
+net_carry:
+  enabled: true
+  funding_rate_annual: 0.02
+  dividend_yield_annual: 0.015
+  switch_cost_bps: 2.0
+  output_column: net_carry_score
 
 portfolio:
   initial_nav: 10000000

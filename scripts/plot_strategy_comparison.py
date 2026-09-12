@@ -10,6 +10,9 @@ import pandas as pd
 
 LABELS = {
     "dynamic_IC_IM_front_switch": "IC/IM近月动态切换",
+    "dynamic_IC_IM_beta_regime": "IC/IM Beta+状态过滤",
+    "dynamic_IC_IM_beta_target": "IC/IM Beta目标仓位",
+    "dynamic_IC_IM_net_carry_front_switch": "IC/IM净Carry动态切换",
     "IC_front": "IC近月基线",
     "IM_front": "IM近月基线",
     "510500_total_return": "510500 ETF（含分红再投资）",
@@ -51,6 +54,9 @@ def main() -> None:
     fig, ax = plt.subplots(figsize=(12, 6.5))
     colors = {
         "dynamic_IC_IM_front_switch": "#c23b22",
+        "dynamic_IC_IM_beta_regime": "#9467bd",
+        "dynamic_IC_IM_beta_target": "#8c564b",
+        "dynamic_IC_IM_net_carry_front_switch": "#ff7f0e",
         "IC_front": "#1f77b4",
         "IM_front": "#2ca02c",
         "510500_total_return": "#7f7f7f",

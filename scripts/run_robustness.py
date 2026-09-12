@@ -18,11 +18,12 @@ from a_share_futures_carry.backtest.engine import backtest_selected_contracts
 from a_share_futures_carry.data.csv_provider import load_contract_panel_csv
 from a_share_futures_carry.metrics.performance import summarize_backtest
 from a_share_futures_carry.metrics.robustness import block_bootstrap_summary
-from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry
+from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry, add_net_carry_score
 from a_share_futures_carry.strategy.allocation import (
     add_dynamic_carry_allocation,
     add_volatility_target_allocation,
 )
+from a_share_futures_carry.strategy.risk import add_beta_target_allocation, add_risk_overlay
 from a_share_futures_carry.strategy.selection import (
     apply_roll_policy,
     select_front_by_score,
@@ -42,13 +43,25 @@ def _prepare(data: pd.DataFrame, cfg: dict, use_fair_value: bool) -> pd.DataFram
         funding_rate_annual=carry["funding_rate_annual"],
         dividend_yield_annual=carry["dividend_yield_annual"],
     )
-    return add_cost_adjusted_carry(
+    out = add_cost_adjusted_carry(
         out,
         carry_column=strategy["carry_column"],
         switch_cost_bps=strategy.get("switch_cost_bps", 0.0),
         day_count=carry["day_count"],
         output_column=strategy.get("selection_score_column", strategy["carry_column"]),
     )
+    net_cfg = cfg.get("net_carry", {})
+    if net_cfg.get("enabled", False):
+        out = add_net_carry_score(
+            out,
+            carry_column="carry_ann",
+            funding_rate_annual=net_cfg.get("funding_rate_annual", carry["funding_rate_annual"]),
+            dividend_yield_annual=net_cfg.get("dividend_yield_annual", carry["dividend_yield_annual"]),
+            switch_cost_bps=net_cfg.get("switch_cost_bps", strategy.get("switch_cost_bps", 0.0)),
+            day_count=carry["day_count"],
+            output_column=net_cfg.get("output_column", "net_carry_score"),
+        )
+    return out
 
 
 def _roll(selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -> pd.DataFrame:
@@ -109,8 +122,60 @@ def _strategies(data: pd.DataFrame, cfg: dict) -> dict[str, pd.DataFrame]:
             min_score_improvement=front_switch_cfg.get("roll_score_buffer", 0.0),
             roll_to_nearest_expiry=True,
         )
+        risk_cfg = cfg.get("risk_control", {})
+        if risk_cfg.get("enabled", False):
+            specs["dynamic_IC_IM_beta_target"] = add_beta_target_allocation(
+                specs["dynamic_IC_IM_front_switch"],
+                target_beta=risk_cfg.get("target_beta", 0.8),
+                lookback=risk_cfg.get("beta_lookback", 60),
+                min_periods=risk_cfg.get("beta_min_periods", 20),
+                max_weight=risk_cfg.get("max_weight", 1.0),
+            )
+            specs["dynamic_IC_IM_beta_regime"] = add_risk_overlay(
+                specs["dynamic_IC_IM_front_switch"],
+                target_beta=risk_cfg.get("target_beta", 0.8),
+                beta_lookback=risk_cfg.get("beta_lookback", 60),
+                beta_min_periods=risk_cfg.get("beta_min_periods", 20),
+                momentum_lookback=risk_cfg.get("momentum_lookback", 63),
+                volatility_lookback=risk_cfg.get("volatility_lookback", 20),
+                volatility_quantile_lookback=risk_cfg.get("volatility_quantile_lookback", 252),
+                volatility_quantile=risk_cfg.get("volatility_quantile", 0.8),
+                downtrend_weight=risk_cfg.get("downtrend_weight", 0.5),
+                high_volatility_weight=risk_cfg.get("high_volatility_weight", 0.5),
+                max_weight=risk_cfg.get("max_weight", 1.0),
+                periods_per_year=cfg["carry"].get("trading_days_per_year", 252),
+            )
+        net_cfg = cfg.get("net_carry", {})
+        if net_cfg.get("enabled", False):
+            net_column = net_cfg.get("output_column", "net_carry_score")
+            net_front = select_front_by_score(
+                data,
+                tuple(front_switch_cfg.get("eligible_families", strategy["eligible_families"])),
+                carry_column=net_column,
+                min_volume=strategy["min_volume"],
+                min_open_interest=strategy["min_open_interest"],
+            )
+            specs["dynamic_IC_IM_net_carry_front_switch"] = apply_roll_policy(
+                net_front,
+                data,
+                roll_before_expiry_days=front_switch_cfg.get("roll_before_expiry_days", 0),
+                min_dte=strategy["min_dte"],
+                max_dte=strategy["max_dte"],
+                score_column=net_column,
+                min_volume=strategy["min_volume"],
+                min_open_interest=strategy["min_open_interest"],
+                min_score_improvement=front_switch_cfg.get("roll_score_buffer", 0.0),
+                roll_to_nearest_expiry=True,
+            )
     rolled = {
-        name: candidate if name == "dynamic_IC_IM_front_switch" else _roll(candidate, data, cfg)
+        name: candidate
+        if name in {
+            "dynamic_IC_IM_front_switch",
+            "dynamic_IC_IM_beta_regime",
+            "dynamic_IC_IM_beta_target",
+            "dynamic_IC_IM_net_carry_front_switch",
+        }
+        else _roll(candidate, data, cfg)
         for name, candidate in specs.items()
     }
     allocation = cfg.get("allocation", {})
@@ -235,6 +300,8 @@ def main() -> None:
     for strategy_name in (
         "IF_front", "IH_front", "IC_front", "IM_front",
         "dynamic_IC_IM_max_carry", "dynamic_IC_IM_front_switch",
+        "dynamic_IC_IM_beta_regime",
+        "dynamic_IC_IM_net_carry_front_switch",
         "dynamic_IC_IM_carry_vol_target",
     ):
         selected = base_strategies.get(strategy_name)

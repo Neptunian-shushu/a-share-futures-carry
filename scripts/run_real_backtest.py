@@ -21,8 +21,9 @@ from a_share_futures_carry.reporting.report import (
     spot_benchmark_backtest,
     spot_benchmark_returns,
 )
-from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry
+from a_share_futures_carry.signals.basis import add_carry_columns, add_cost_adjusted_carry, add_net_carry_score
 from a_share_futures_carry.strategy.allocation import add_dynamic_carry_allocation, add_volatility_target_allocation
+from a_share_futures_carry.strategy.risk import add_beta_target_allocation, add_risk_overlay
 from a_share_futures_carry.strategy.selection import (
     apply_roll_policy,
     select_front_by_score,
@@ -129,6 +130,17 @@ def main() -> None:
         day_count=carry_cfg["day_count"],
         output_column=selection_score_column,
     )
+    net_carry_cfg = cfg.get("net_carry", {})
+    if net_carry_cfg.get("enabled", False):
+        data = add_net_carry_score(
+            data,
+            carry_column="carry_ann",
+            funding_rate_annual=net_carry_cfg.get("funding_rate_annual", carry_cfg["funding_rate_annual"]),
+            dividend_yield_annual=net_carry_cfg.get("dividend_yield_annual", carry_cfg["dividend_yield_annual"]),
+            switch_cost_bps=net_carry_cfg.get("switch_cost_bps", strategy.get("switch_cost_bps", 0.0)),
+            day_count=carry_cfg["day_count"],
+            output_column=net_carry_cfg.get("output_column", "net_carry_score"),
+        )
     backtests: dict[str, pd.DataFrame] = {}
     benchmarks: dict[str, pd.Series] = {}
 
@@ -207,6 +219,59 @@ def main() -> None:
         backtests["dynamic_IC_IM_front_switch"] = _run_one(
             "dynamic_IC_IM_front_switch", front_switch, data, cfg
         )
+        if net_carry_cfg.get("enabled", False):
+            net_column = net_carry_cfg.get("output_column", "net_carry_score")
+            net_front = select_front_by_score(
+                data,
+                tuple(front_switch_cfg.get("eligible_families", strategy["eligible_families"])),
+                carry_column=net_column,
+                min_volume=strategy["min_volume"],
+                min_open_interest=strategy["min_open_interest"],
+            )
+            net_front = apply_roll_policy(
+                net_front,
+                data,
+                roll_before_expiry_days=front_switch_cfg.get("roll_before_expiry_days", 0),
+                min_dte=strategy["min_dte"],
+                max_dte=strategy["max_dte"],
+                score_column=net_column,
+                min_volume=strategy["min_volume"],
+                min_open_interest=strategy["min_open_interest"],
+                min_score_improvement=front_switch_cfg.get("roll_score_buffer", 0.0),
+                roll_to_nearest_expiry=True,
+            )
+            backtests["dynamic_IC_IM_net_carry_front_switch"] = _run_one(
+                "dynamic_IC_IM_net_carry_front_switch", net_front, data, cfg
+            )
+        risk_cfg = cfg.get("risk_control", {})
+        if risk_cfg.get("enabled", False):
+            beta_selected = add_beta_target_allocation(
+                front_switch,
+                target_beta=risk_cfg.get("target_beta", 0.8),
+                lookback=risk_cfg.get("beta_lookback", 60),
+                min_periods=risk_cfg.get("beta_min_periods", 20),
+                max_weight=risk_cfg.get("max_weight", 1.0),
+            )
+            backtests["dynamic_IC_IM_beta_target"] = _run_one(
+                "dynamic_IC_IM_beta_target", beta_selected, data, cfg
+            )
+            risk_selected = add_risk_overlay(
+                front_switch,
+                target_beta=risk_cfg.get("target_beta", 0.8),
+                beta_lookback=risk_cfg.get("beta_lookback", 60),
+                beta_min_periods=risk_cfg.get("beta_min_periods", 20),
+                momentum_lookback=risk_cfg.get("momentum_lookback", 63),
+                volatility_lookback=risk_cfg.get("volatility_lookback", 20),
+                volatility_quantile_lookback=risk_cfg.get("volatility_quantile_lookback", 252),
+                volatility_quantile=risk_cfg.get("volatility_quantile", 0.8),
+                downtrend_weight=risk_cfg.get("downtrend_weight", 0.5),
+                high_volatility_weight=risk_cfg.get("high_volatility_weight", 0.5),
+                max_weight=risk_cfg.get("max_weight", 1.0),
+                periods_per_year=carry_cfg.get("trading_days_per_year", 252),
+            )
+            backtests["dynamic_IC_IM_beta_regime"] = _run_one(
+                "dynamic_IC_IM_beta_regime", risk_selected, data, cfg
+            )
 
     allocation_cfg = cfg.get("allocation", {})
     if allocation_cfg.get("enabled", False) and not dynamic.empty:
