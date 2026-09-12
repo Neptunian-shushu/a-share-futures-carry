@@ -53,3 +53,18 @@ def test_standalone_im_curve_starts_at_listing_date():
 
     assert result["year"].tolist() == [2022]
     assert result.loc[0, "total_return"] == pytest.approx(0.10)
+
+
+def test_ic_family_curves_start_at_actual_data_date():
+    curves = pd.DataFrame(
+        {
+            "strategy": ["IC_front", "IC_front"],
+            "trade_date": pd.to_datetime(["2015-01-05", "2015-04-16"]),
+            "return": [0.01, 0.10],
+        }
+    )
+
+    result = build_annual_performance(curves, strategies=["IC_front"])
+
+    assert result.loc[0, "period_start"] == "2015-04-16"
+    assert result.loc[0, "total_return"] == pytest.approx(0.10)

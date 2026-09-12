@@ -21,13 +21,19 @@ LABELS = {
     "510500_total_return": "510500 ETF总收益",
 }
 
-# IM was listed on 2022-07-22.  The long backtest keeps the full calendar so
-# composite strategies can fall back to IC before that date, but the standalone
-# IM curve contains inactive rows before listing.  Exclude those rows from the
-# standalone annual report instead of treating collateral-only wealth as IM
-# performance.
+# The long backtest keeps a unified calendar and therefore includes inactive
+# rows before a family becomes available.  Exclude those rows from annual
+# reporting instead of treating collateral-only wealth as strategy performance.
 MIN_START_DATES = {
+    "IF_front": pd.Timestamp("2015-01-05"),
+    "IH_front": pd.Timestamp("2015-04-16"),
+    "IC_front": pd.Timestamp("2015-04-16"),
     "IM_front": pd.Timestamp("2022-07-22"),
+    "dynamic_IC_IM_front_switch": pd.Timestamp("2015-04-16"),
+    "dynamic_IC_IM_beta_target": pd.Timestamp("2015-04-16"),
+    "dynamic_IC_IM_max_carry": pd.Timestamp("2015-04-16"),
+    "dynamic_IC_IM_carry_vol_target": pd.Timestamp("2015-04-16"),
+    "510500_total_return": pd.Timestamp("2022-07-22"),
 }
 
 
@@ -130,7 +136,13 @@ def _markdown_table(details: pd.DataFrame) -> str:
     for column in returns.columns:
         if column != "year":
             returns[column] = returns[column].map(lambda value: "" if pd.isna(value) else f"{value:.2%}")
-    lines = ["# 分年度策略表现", "", "年度收益为该自然年内日收益复合结果；2022 年和 2026 年为不完整年度。", "", returns.to_markdown(index=False)]
+    lines = [
+        "# 分年度策略表现",
+        "",
+        "年度收益为该自然年内日收益复合结果；首尾年度可能因品种上市日期或样本截止日期而不完整，具体起止日期见下方风险表。",
+        "",
+        returns.to_markdown(index=False),
+    ]
     lines.extend(["", "## 年度风险指标", ""])
     risk = details[[
         "year", "strategy_label", "period_start", "period_end", "annualized_vol",

@@ -28,7 +28,15 @@ DEFAULT_STRATEGIES = [
 ]
 
 MIN_START_DATES = {
+    "IF_front": pd.Timestamp("2015-01-05"),
+    "IH_front": pd.Timestamp("2015-04-16"),
+    "IC_front": pd.Timestamp("2015-04-16"),
     "IM_front": pd.Timestamp("2022-07-22"),
+    "dynamic_IC_IM_front_switch": pd.Timestamp("2015-04-16"),
+    "dynamic_IC_IM_beta_target": pd.Timestamp("2015-04-16"),
+    "dynamic_IC_IM_max_carry": pd.Timestamp("2015-04-16"),
+    "dynamic_IC_IM_carry_vol_target": pd.Timestamp("2015-04-16"),
+    "510500_total_return": pd.Timestamp("2022-07-22"),
 }
 
 
