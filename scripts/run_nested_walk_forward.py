@@ -130,6 +130,7 @@ def _run(selected: pd.DataFrame, data: pd.DataFrame, cfg: dict) -> pd.DataFrame:
         max_participation_rate=p.get("max_participation_rate"),
         spread_bps_column=p.get("spread_bps_column"),
         default_spread_bps=p.get("default_spread_bps", 0.0),
+        require_spread_data=p.get("require_spread_data", False),
     )
 
 

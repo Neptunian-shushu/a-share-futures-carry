@@ -64,6 +64,9 @@ portfolio:
   max_participation_rate: 0.10
   spread_bps_column: spread_bps
   default_spread_bps: 0.0
+  # Keep false for the free-data research snapshot; production runs should
+  # enable this after supplying row-level executable spread observations.
+  require_spread_data: false
 
 allocation:
   enabled: true

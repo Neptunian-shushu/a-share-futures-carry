@@ -255,6 +255,9 @@ The engine accepts dated `spread_bps` observations and volume participation limi
 has volume but no bid/ask quotes, so its 0/1/2bp spread matrix is an explicit sensitivity analysis, not a
 reconstruction of executable market depth. Once quote data is available, populate `spread_bps` and rerun the
 same commands; missing spread coverage is reported in the summary.
+For a production-style fail-closed run, set `portfolio.require_spread_data: true`;
+any day with turnover and no row-level spread then raises instead of silently using
+`default_spread_bps`.
 
 ## Research reports
 

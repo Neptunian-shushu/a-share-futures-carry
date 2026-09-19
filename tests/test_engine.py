@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from a_share_futures_carry.backtest.engine import backtest_selected_contracts
 
@@ -142,3 +143,22 @@ def test_missing_spread_column_is_flagged_when_default_is_used():
     )
     assert result["spread_data_missing"].all()
     assert (result["effective_cost_bps"] == 3.0).all()
+
+
+def test_required_spread_data_fails_closed_on_turnover():
+    market = _panel({"IC2602": [100.0, 101.0, 102.0]})
+    selected = market.copy()
+    with pytest.raises(ValueError, match="Missing required spread_bps"):
+        backtest_selected_contracts(
+            selected,
+            initial_nav=100_000.0,
+            max_notional_to_nav=0.1,
+            collateral_yield_annual=0.0,
+            transaction_cost_bps=1.0,
+            market_data=market,
+            signal_lag_sessions=0,
+            margin_rate=0.0,
+            spread_bps_column="spread_bps",
+            default_spread_bps=0.0,
+            require_spread_data=True,
+        )

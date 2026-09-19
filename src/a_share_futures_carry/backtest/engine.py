@@ -72,6 +72,7 @@ def backtest_selected_contracts(
     max_participation_rate: float | None = None,
     spread_bps_column: str | None = None,
     default_spread_bps: float = 0.0,
+    require_spread_data: bool = False,
 ) -> pd.DataFrame:
     """Backtest one selected contract per signal date.
 
@@ -90,7 +91,9 @@ def backtest_selected_contracts(
     ``max_participation_rate`` caps the daily order in contracts using the
     target row's ``vol`` field. ``spread_bps_column`` can supply a row-level
     round-trip spread estimate; otherwise ``default_spread_bps`` is used and
-    the returned diagnostics flag the missing spread observation.
+    the returned diagnostics flag the missing spread observation. When
+    ``require_spread_data`` is true, a missing spread on a day with turnover
+    raises instead of silently falling back to the default.
     """
     if initial_nav <= 0:
         raise ValueError("initial_nav must be positive")
@@ -274,6 +277,10 @@ def backtest_selected_contracts(
                     spread_data_missing = True
             else:
                 spread_data_missing = True
+        if require_spread_data and spread_bps_column and spread_data_missing and turnover_notional > 0:
+            raise ValueError(
+                f"Missing required {spread_bps_column} for executable turnover on {date.date()}"
+            )
         effective_cost_bps = transaction_cost_bps + spread_bps
         trading_cost = turnover_notional * effective_cost_bps / 10_000.0
         nav = nav_before_trade - trading_cost

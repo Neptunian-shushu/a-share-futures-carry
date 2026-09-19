@@ -141,6 +141,7 @@ def main() -> None:
         max_participation_rate=p.get("max_participation_rate"),
         spread_bps_column=p.get("spread_bps_column"),
         default_spread_bps=p.get("default_spread_bps", 0.0),
+        require_spread_data=p.get("require_spread_data", False),
     )
     summary = summarize_backtest(bt)
     print(pd.Series(summary).to_string())
