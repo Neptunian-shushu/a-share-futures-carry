@@ -21,6 +21,18 @@ front_switch:
   # production-facing choice that reduces turnover without worsening drawdown.
   roll_score_buffer: 0.02
 
+neutral_overlay:
+  enabled: true
+  hedge_family: IF
+  # Keep long + short gross notional at 1.0x NAV for a conservative comparison
+  # with the current one-leg strategy.
+  long_notional_to_nav: 0.5
+  gross_notional_to_nav: 1.0
+  beta_lookback: 60
+  beta_min_periods: 20
+  fallback_beta: 1.0
+  max_beta: 2.0
+
 risk_control:
   enabled: true
   # Default production-facing candidate: reduce equity beta without

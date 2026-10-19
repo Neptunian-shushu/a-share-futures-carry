@@ -18,12 +18,15 @@ def _display_strategy_name(name: str) -> str:
         "max_carry": "最大Carry", "dynamic_IC_IM_front_switch": "IC/IM近月动态切换",
         "dynamic_IC_IM_beta_regime": "IC/IM Beta+状态过滤",
         "dynamic_IC_IM_beta_target": "IC/IM Beta目标仓位",
+        "dynamic_IC_IM_beta_neutral_IF_hedge": "IC/IM Beta中性（IF对冲）",
         "dynamic_IC_IM_net_carry_front_switch": "IC/IM净Carry动态切换",
         "dynamic_IC_IM": "IC/IM动态",
         "carry_allocation": "Carry仓位", "carry_vol_target": "Carry+波动率目标",
         "CSI500_ETF_raw_close": "中证500 ETF（未含分红）",
         "510500_total_return": "510500 ETF（含分红再投资）",
     }
+    if name in labels:
+        return labels[name]
     result = name
     for source, target in labels.items():
         result = result.replace(source, target)

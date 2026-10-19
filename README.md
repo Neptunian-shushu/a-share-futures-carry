@@ -402,6 +402,17 @@ python scripts/run_front_switch_walk_forward.py \
   --config configs/strategy.yaml
 ```
 
+研究 Beta 中性版本：保留 IC/IM 动态 Carry 多头，使用 IF 近月空头按滚动 beta 对冲；多空总名义敞口默认限制为 1.0x NAV，避免中性化过程隐含增加杠杆：
+
+```bash
+python scripts/run_beta_neutral_backtest.py \
+  --data data/raw/cffex_panel_cffex_public_if_ih_ic_im_long.csv \
+  --config configs/strategy.yaml \
+  --output-dir outputs/beta_neutral_report
+```
+
+该版本用于判断去除市场方向暴露后，Carry 收益是否仍然存在；它不是现货融券式的纯现金 Carry，仍然承受 IC/IM 与 IF 之间的相对基差、风格差异、空头换仓和保证金风险。
+
 生成分年度收益和风险表：
 
 ```bash
